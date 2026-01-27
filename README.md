@@ -2,7 +2,7 @@
 
 Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/clawdbot) on DigitalOcean App Platform.
 
-[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/bikramkgupta/clawdbot-appplatform/tree/main)
+[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/clawdbot-appplatform/tree/main)
 
 ## Features
 
@@ -25,7 +25,7 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 │           GHCR Image: ghcr.io/bikramkgupta/                 │
 │                    clawdbot-appplatform                          │
 │  ┌───────────┐  ┌───────────┐  ┌────────────────────────────┐   │
-│  │ Node 22   │  │ Clawdbot  │  │ Litestream (optional)      │   │
+│  │ Node 24   │  │ Clawdbot  │  │ Litestream (optional)      │   │
 │  │ (slim)    │  │ (latest)  │  │ SQLite → DO Spaces backup  │   │
 │  └───────────┘  └───────────┘  └────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
@@ -60,9 +60,12 @@ Without these, the app runs in ephemeral mode - state is lost on redeploy.
 
 | Resource | Value |
 |----------|-------|
-| CPU | 1 vCPU |
-| RAM | 1 GB |
-| Cost | ~$10/mo (+ $5/mo Spaces optional) |
+| CPU | 1 shared vCPU |
+| RAM | 2 GB |
+| Instance | `apps-s-1vcpu-2gb` |
+| Cost | ~$25/mo (+ $5/mo Spaces optional) |
+
+> **Note:** The gateway requires 2GB RAM to start reliably. Using `basic-xs` (1GB) will result in OOM errors.
 
 ## Available Regions
 
@@ -82,7 +85,7 @@ Edit the `region` field in `app.yaml` to change.
 
 ```bash
 # Clone and deploy
-git clone https://github.com/bikramkgupta/clawdbot-appplatform
+git clone https://github.com/digitalocean-labs/clawdbot-appplatform
 cd clawdbot-appplatform
 
 # Validate spec
