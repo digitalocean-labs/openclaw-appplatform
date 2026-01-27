@@ -9,7 +9,7 @@ spec:
         repository: clawdbot-appplatform
         tag: latest
       instance_count: 1
-      instance_size_slug: basic-xs
+      instance_size_slug: apps-s-1vcpu-2gb
       http_port: 8080
       health_check:
         http_path: /health

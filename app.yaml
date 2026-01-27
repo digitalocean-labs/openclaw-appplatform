@@ -10,7 +10,7 @@ services:
       repository: clawdbot-appplatform
       tag: latest
     instance_count: 1
-    instance_size_slug: basic-xs  # 1 vCPU, 1GB RAM, ~$10/mo
+    instance_size_slug: apps-s-1vcpu-2gb  # 1 shared vCPU, 2GB RAM, ~$25/mo
     http_port: 8080
     health_check:
       http_path: /health
