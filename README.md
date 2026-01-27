@@ -99,12 +99,46 @@ doctl apps create --spec app.yaml
 
 ## Setting Up Persistence
 
-1. Create a Spaces bucket in the same region as your app
-2. Create Spaces access keys (Settings → API → Spaces Keys)
-3. Add the Litestream environment variables to your app
-4. Redeploy
+App Platform doesn't have persistent volumes, so this image uses DO Spaces for state backup.
 
-The app will automatically restore from backup on boot and continuously replicate changes.
+### What Gets Persisted
+
+| Data Type | Backup Method | Description |
+|-----------|--------------|-------------|
+| Memory search index | Litestream (real-time) | SQLite database for vector search |
+| Config, devices, sessions | S3 backup (every 5 min) | JSON state files |
+
+### Setup Steps
+
+1. **Create a Spaces bucket** in the same region as your app
+   - Go to **Spaces Object Storage** → **Create Bucket**
+   - Name: e.g., `clawdbot-backup`
+   - Region: match your app (e.g., `tor1` for Toronto)
+
+2. **Create Spaces access keys**
+   - Go to **Settings → API → Spaces Keys**
+   - Click **Generate New Key**
+   - Save both Access Key and Secret Key
+
+3. **Add environment variables** to your App Platform app:
+   - `LITESTREAM_ACCESS_KEY_ID` = your access key
+   - `LITESTREAM_SECRET_ACCESS_KEY` = your secret key
+   - `SPACES_ENDPOINT` = `<region>.digitaloceanspaces.com` (e.g., `tor1.digitaloceanspaces.com`)
+   - `SPACES_BUCKET` = your bucket name
+
+4. **Redeploy** the app
+
+### How It Works
+
+On startup:
+1. Restores JSON state backup from Spaces (if exists)
+2. Restores SQLite memory database via Litestream (if exists)
+3. Starts the gateway
+
+During operation:
+- Litestream continuously replicates SQLite changes (1s sync interval)
+- JSON state is backed up every 5 minutes
+- On graceful shutdown (SIGTERM), final state backup is saved
 
 ## Documentation
 

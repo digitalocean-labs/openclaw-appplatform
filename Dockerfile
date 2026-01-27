@@ -9,14 +9,18 @@ ENV PORT=8080 \
     CLAWDBOT_WORKSPACE_DIR=/data/workspace \
     NODE_ENV=production
 
-# Install OS deps + Litestream
+# Install OS deps + Litestream + s3cmd for state backup
 # Note: Litestream 0.5.x uses x86_64 (not amd64) and no 'v' prefix in filename
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         wget \
-        git; \
+        curl \
+        openssl \
+        git \
+        s3cmd \
+        python3; \
     LITESTREAM_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo x86_64 )"; \
     wget -O /tmp/litestream.deb \
       https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-${LITESTREAM_ARCH}.deb; \

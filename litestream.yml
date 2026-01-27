@@ -1,10 +1,12 @@
 dbs:
-  - path: ${CLAWDBOT_STATE_DIR}/memory.db
+  # Memory search SQLite database (default agent = main)
+  # Path: ~/.clawdbot/memory/{agentId}.sqlite
+  - path: ${CLAWDBOT_STATE_DIR}/memory/main.sqlite
     replicas:
       - type: s3
-        endpoint: ${SPACES_ENDPOINT}
+        endpoint: https://${SPACES_ENDPOINT}
         bucket: ${SPACES_BUCKET}
-        path: clawdbot
+        path: clawdbot/memory-main
         access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
         secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
         sync-interval: 1s
