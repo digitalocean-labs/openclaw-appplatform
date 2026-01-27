@@ -20,6 +20,20 @@ if [ -z "$CLAWDBOT_GATEWAY_TOKEN" ]; then
   echo "Generated gateway token (ephemeral)"
 fi
 
+# Create config file for cloud deployment
+# Note: Control UI device auth bypass requires clawdbot >= 2026.1.25
+CONFIG_FILE="$CLAWDBOT_STATE_DIR/clawdbot.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+  echo "Creating initial config: $CONFIG_FILE"
+  cat > "$CONFIG_FILE" << 'CONFIGEOF'
+{
+  "gateway": {
+    "mode": "local"
+  }
+}
+CONFIGEOF
+fi
+
 PORT="${PORT:-8080}"
 echo "Starting gateway: port=$PORT bind=lan"
 
