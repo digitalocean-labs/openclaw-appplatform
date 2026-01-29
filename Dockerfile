@@ -66,10 +66,6 @@ RUN set -eux; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
-# Copy configuration files
-COPY litestream.yml /etc/litestream.yml
-COPY moltbot.default.json /etc/moltbot/moltbot.default.json
-
 # Create non-root user with sudo access and SSH capability
 RUN useradd -m -d /home/moltbot -s /bin/bash moltbot \
     && mkdir -p "${MOLTBOT_STATE_DIR}" "${MOLTBOT_WORKSPACE_DIR}" "${TS_STATE_DIR}" \
