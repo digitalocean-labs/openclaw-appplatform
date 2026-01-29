@@ -267,6 +267,16 @@ if [ "$GATEWAY_MODE" = "tailscale" ]; then
   /usr/local/bin/containerboot &
 fi
 
+# Start SSH server if enabled
+if [ "${ENABLE_SSH:-false}" = "true" ]; then
+  echo "Starting SSH server..."
+  # Generate host keys if they don't exist
+  sudo ssh-keygen -A 2>/dev/null || true
+  # Start sshd in the background
+  sudo /usr/sbin/sshd
+  echo "SSH server started on port 22"
+fi
+
 # Start gateway - all configuration is in the config file
 echo "Starting clawdbot gateway..."
 if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
