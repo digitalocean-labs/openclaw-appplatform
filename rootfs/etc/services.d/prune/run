@@ -16,5 +16,5 @@ echo "[prune] Starting prune loop (every ${PRUNE_INTERVAL}s)..."
 
 while true; do
   sleep "$PRUNE_INTERVAL"
-  /usr/local/bin/moltbot-prune
+  /usr/local/bin/restic-prune
 done

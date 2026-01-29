@@ -16,5 +16,5 @@ echo "[backup] Starting backup loop (every ${BACKUP_INTERVAL}s)..."
 
 while true; do
   sleep "$BACKUP_INTERVAL"
-  /usr/local/bin/moltbot-backup
+  /usr/local/bin/restic-backup
 done

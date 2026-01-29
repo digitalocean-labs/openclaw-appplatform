@@ -2,5 +2,5 @@
 # Graceful shutdown - save state before exit
 
 echo "[moltbot] Service stopping, saving state..."
-/usr/local/bin/moltbot-backup --quiet
+/usr/local/bin/restic-backup --quiet
 echo "[moltbot] State saved"
