@@ -52,10 +52,9 @@ spec:
     - key: TS_SOCKET
       scope: RUN_AND_BUILD_TIME
       value: /tmp/tailscaled.sock
-    github:
+    git:
       branch: main
-      deploy_on_push: true
-      repo: digitalocean-labs/clawdbot-appplatform
+      repo_clone_url: https://github.com/digitalocean-labs/clawdbot-appplatform.git
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-1gb
     name: clawdbot
