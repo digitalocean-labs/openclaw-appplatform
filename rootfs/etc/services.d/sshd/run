@@ -1,0 +1,17 @@
+#!/command/with-contenv bash
+# SSH server (optional, enabled via ENABLE_SSH=true)
+
+if [ "${ENABLE_SSH:-false}" != "true" ]; then
+  echo "[sshd] SSH disabled (set ENABLE_SSH=true to enable)"
+  # Mark this service as down so s6 doesn't restart it
+  s6-svc -Od .
+  exit 0
+fi
+
+echo "[sshd] Starting SSH server..."
+
+# Generate host keys if they don't exist
+ssh-keygen -A 2>/dev/null || true
+
+# Run sshd in foreground mode
+exec /usr/sbin/sshd -D -e

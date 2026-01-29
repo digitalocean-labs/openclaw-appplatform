@@ -1,0 +1,50 @@
+#!/command/with-contenv bash
+# Graceful shutdown - save state before exit
+
+echo "[moltbot] Service stopping, saving state..."
+
+# Only backup if persistence is configured
+if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
+  # Ensure s3cmd config exists
+  if [ ! -f /tmp/.s3cfg ]; then
+    cat > /tmp/.s3cfg << EOF
+[default]
+access_key = ${LITESTREAM_ACCESS_KEY_ID}
+secret_key = ${LITESTREAM_SECRET_ACCESS_KEY}
+host_base = ${SPACES_ENDPOINT}
+host_bucket = %(bucket)s.${SPACES_ENDPOINT}
+use_https = True
+EOF
+  fi
+
+  # Backup moltbot state
+  echo "[moltbot] Backing up moltbot state..."
+  cd "$MOLTBOT_STATE_DIR"
+  tar -czf /tmp/state-backup.tar.gz \
+    --exclude='memory' \
+    --exclude='*.sqlite*' \
+    --exclude='*.db*' \
+    --exclude='gateway.*.lock' \
+    . 2>/dev/null || true
+
+  if [ -f /tmp/state-backup.tar.gz ]; then
+    s3cmd -c /tmp/.s3cfg put /tmp/state-backup.tar.gz \
+      "s3://${SPACES_BUCKET}/moltbot/state-backup.tar.gz" || true
+    rm -f /tmp/state-backup.tar.gz
+  fi
+
+  # Backup Tailscale state
+  if [ -d "$TS_STATE_DIR" ]; then
+    echo "[moltbot] Backing up Tailscale state..."
+    cd "$TS_STATE_DIR"
+    tar -czf /tmp/tailscale-state.tar.gz . 2>/dev/null || true
+
+    if [ -f /tmp/tailscale-state.tar.gz ]; then
+      s3cmd -c /tmp/.s3cfg put /tmp/tailscale-state.tar.gz \
+        "s3://${SPACES_BUCKET}/moltbot/tailscale-state.tar.gz" || true
+      rm -f /tmp/tailscale-state.tar.gz
+    fi
+  fi
+
+  echo "[moltbot] State backup complete"
+fi

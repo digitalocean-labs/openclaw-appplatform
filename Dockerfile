@@ -11,15 +11,19 @@ COPY tailscale /usr/local/bin/tailscale
 ARG TARGETARCH
 ARG MOLTBOT_VERSION=latest
 ARG LITESTREAM_VERSION=0.5.6
+ARG S6_OVERLAY_VERSION=3.2.1.0
 ARG NODE_MAJOR=24
 
 ENV MOLTBOT_STATE_DIR=/data/.moltbot \
     MOLTBOT_WORKSPACE_DIR=/data/workspace \
     TS_STATE_DIR=/data/tailscale \
     NODE_ENV=production \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    S6_KEEP_ENV=1 \
+    S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
+    S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
 
-# Install OS deps + Node.js + sshd + Litestream + s3cmd
+# Install OS deps + Node.js + sshd + Litestream + s3cmd + s6-overlay
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -33,7 +37,8 @@ RUN set -eux; \
       git \
       s3cmd \
       python3 \
-      openssh-server; \
+      openssh-server \
+      xz-utils; \
     # Install Node.js from NodeSource
     mkdir -p /etc/apt/keyrings; \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg; \
@@ -46,6 +51,15 @@ RUN set -eux; \
       https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-${LITESTREAM_ARCH}.deb; \
     dpkg -i /tmp/litestream.deb; \
     rm /tmp/litestream.deb; \
+    # Install s6-overlay
+    S6_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo aarch64 || echo x86_64 )"; \
+    wget -O /tmp/s6-overlay-noarch.tar.xz \
+      https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz; \
+    wget -O /tmp/s6-overlay-arch.tar.xz \
+      https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz; \
+    tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz; \
+    tar -C / -Jxpf /tmp/s6-overlay-arch.tar.xz; \
+    rm /tmp/s6-overlay-*.tar.xz; \
     # Setup SSH
     mkdir -p /run/sshd; \
     # Cleanup
@@ -53,10 +67,8 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 # Copy configuration files
-COPY entrypoint.sh /entrypoint.sh
 COPY litestream.yml /etc/litestream.yml
 COPY moltbot.default.json /etc/moltbot/moltbot.default.json
-RUN chmod +x /entrypoint.sh
 
 # Create non-root user with sudo access and SSH capability
 RUN useradd -m -d /home/moltbot -s /bin/bash moltbot \
@@ -95,10 +107,8 @@ COPY rootfs/ /
 # Fix ownership for any files copied to moltbot's home
 RUN chown -R moltbot:moltbot /home/moltbot 2>/dev/null || true
 
-# Switch back to moltbot for runtime
-USER moltbot
-
 # Expose ports: 8080 for LAN mode, 22 for SSH
 EXPOSE 8080 22
 
-ENTRYPOINT ["/entrypoint.sh"]
+# s6-overlay init (must run as root, services drop privileges as needed)
+ENTRYPOINT ["/init"]

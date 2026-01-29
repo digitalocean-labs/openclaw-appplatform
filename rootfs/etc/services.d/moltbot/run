@@ -1,0 +1,17 @@
+#!/command/with-contenv bash
+# Moltbot gateway service (runs as moltbot user)
+
+echo "[moltbot] Starting moltbot gateway..."
+
+# Wait briefly for Tailscale to initialize
+sleep 2
+
+if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
+  echo "[moltbot] Mode: Litestream + state backup enabled"
+  # Run gateway with Litestream for SQLite replication (as moltbot user)
+  exec s6-setuidgid moltbot litestream replicate -config /etc/litestream.yml \
+    -exec "moltbot gateway --allow-unconfigured"
+else
+  echo "[moltbot] Mode: ephemeral (no persistence)"
+  exec s6-setuidgid moltbot moltbot gateway --allow-unconfigured
+fi

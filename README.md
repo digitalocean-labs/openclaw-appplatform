@@ -12,6 +12,7 @@ Pre-built Docker image for deploying [Moltbot](https://github.com/moltbot/moltbo
 - **Gradient AI support** - Use DigitalOcean's serverless AI inference
 - **SSH access** - Optional SSH server for remote access
 - **Multi-arch** support (amd64/arm64)
+- **s6-overlay** - Proper process supervision with drop-in customization
 
 ## Quick Start
 
@@ -25,6 +26,9 @@ Pre-built Docker image for deploying [Moltbot](https://github.com/moltbot/moltbo
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                     moltbot-appplatform                          │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ s6-overlay - Process supervision and init system            ││
+│  └─────────────────────────────────────────────────────────────┘│
 │  ┌─────────────┐  ┌───────────┐  ┌──────────────────────────┐   │
 │  │ Ubuntu      │  │ Moltbot   │  │ Litestream (optional)    │   │
 │  │ Noble+Node  │  │ (latest)  │  │ SQLite → DO Spaces       │   │
@@ -128,11 +132,18 @@ doctl apps create --spec app.yaml
 
 The `rootfs/` directory allows you to add or override any files in the container. Files are copied to `/` at the end of the Docker build.
 
-### Examples
+This image uses [s6-overlay](https://github.com/just-containers/s6-overlay) for process supervision, which provides two ways to add custom logic:
+
+### Directory Structure
 
 ```
 rootfs/
 ├── etc/
+│   ├── cont-init.d/               # One-time initialization scripts
+│   │   └── 30-my-setup            # Runs once at startup
+│   ├── services.d/                # Long-running services (supervised)
+│   │   └── my-daemon/
+│   │       └── run                # Daemon start script
 │   ├── ssh/
 │   │   └── sshd_config.d/
 │   │       └── 10-custom.conf     → /etc/ssh/sshd_config.d/10-custom.conf
@@ -142,7 +153,50 @@ rootfs/
         └── .bashrc                 → /home/moltbot/.bashrc
 ```
 
-### Notes
+### Initialization Scripts (`cont-init.d`)
+
+One-time scripts that run at container startup before services start. Scripts run in alphanumeric order.
+
+**Example:** `rootfs/etc/cont-init.d/30-install-tools`
+
+```bash
+#!/command/with-contenv bash
+# Install additional tools
+apt-get update && apt-get install -y vim htop
+```
+
+**Notes:**
+- Use `#!/command/with-contenv bash` to inherit environment variables
+- Scripts run as root
+- Built-in scripts use `10-` and `20-` prefixes; use `30-` or higher for custom scripts
+
+### Custom Services (`services.d`)
+
+Long-running daemons that s6 supervises and restarts if they crash.
+
+**Example:** `rootfs/etc/services.d/my-daemon/run`
+
+```bash
+#!/command/with-contenv bash
+exec my-daemon --foreground
+```
+
+**Notes:**
+- The `run` script must `exec` the daemon (not fork to background)
+- s6 automatically restarts the service if it exits
+- Add a `finish` script for cleanup on shutdown
+- Add a `down` file to disable the service by default
+
+### Built-in Services
+
+| Service | Description |
+|---------|-------------|
+| `tailscale` | Tailscale daemon (required) |
+| `moltbot` | Moltbot gateway |
+| `sshd` | SSH server (if `ENABLE_SSH=true`) |
+| `backup` | Periodic state backup (if persistence configured) |
+
+### General Notes
 
 - Files are copied with `COPY rootfs/ /` which preserves directory structure
 - Existing files in the container will be overwritten

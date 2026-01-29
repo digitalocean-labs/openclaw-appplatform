@@ -1,0 +1,64 @@
+#!/command/with-contenv bash
+# Periodic backup to DO Spaces (every 5 minutes)
+
+# Skip if persistence not configured
+if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
+  echo "[backup] Persistence not configured, backup service disabled"
+  s6-svc -Od .
+  exit 0
+fi
+
+echo "[backup] Starting backup loop (every 5 minutes)..."
+
+# Ensure s3cmd config exists
+cat > /tmp/.s3cfg << EOF
+[default]
+access_key = ${LITESTREAM_ACCESS_KEY_ID}
+secret_key = ${LITESTREAM_SECRET_ACCESS_KEY}
+host_base = ${SPACES_ENDPOINT}
+host_bucket = %(bucket)s.${SPACES_ENDPOINT}
+use_https = True
+EOF
+chmod 600 /tmp/.s3cfg
+
+backup_moltbot_state() {
+  echo "[backup] Backing up moltbot state..."
+  cd "$MOLTBOT_STATE_DIR"
+  tar -czf /tmp/state-backup.tar.gz \
+    --exclude='memory' \
+    --exclude='*.sqlite*' \
+    --exclude='*.db*' \
+    --exclude='gateway.*.lock' \
+    . 2>/dev/null || true
+
+  if [ -f /tmp/state-backup.tar.gz ]; then
+    s3cmd -c /tmp/.s3cfg put /tmp/state-backup.tar.gz \
+      "s3://${SPACES_BUCKET}/moltbot/state-backup.tar.gz" && \
+      echo "[backup] Moltbot state uploaded" || \
+      echo "[backup] Warning: moltbot state upload failed"
+    rm -f /tmp/state-backup.tar.gz
+  fi
+}
+
+backup_tailscale_state() {
+  if [ -d "$TS_STATE_DIR" ]; then
+    echo "[backup] Backing up Tailscale state..."
+    cd "$TS_STATE_DIR"
+    tar -czf /tmp/tailscale-state.tar.gz . 2>/dev/null || true
+
+    if [ -f /tmp/tailscale-state.tar.gz ]; then
+      s3cmd -c /tmp/.s3cfg put /tmp/tailscale-state.tar.gz \
+        "s3://${SPACES_BUCKET}/moltbot/tailscale-state.tar.gz" && \
+        echo "[backup] Tailscale state uploaded" || \
+        echo "[backup] Warning: Tailscale state upload failed"
+      rm -f /tmp/tailscale-state.tar.gz
+    fi
+  fi
+}
+
+# Main backup loop
+while true; do
+  sleep 300
+  backup_moltbot_state
+  backup_tailscale_state
+done
