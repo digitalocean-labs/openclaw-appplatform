@@ -3,8 +3,5 @@
 
 echo "[moltbot] Starting moltbot gateway..."
 
-# Wait briefly for Tailscale to initialize
-sleep 2
-
 # Run gateway directly (litestream runs as separate service)
 exec s6-setuidgid moltbot moltbot gateway --allow-unconfigured

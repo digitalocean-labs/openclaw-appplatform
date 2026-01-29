@@ -3,6 +3,10 @@
 
 set -e
 
+# Ensure state directory exists with correct ownership
+mkdir -p "$MOLTBOT_STATE_DIR"
+chown moltbot:moltbot "$MOLTBOT_STATE_DIR"
+
 DEFAULT_CONFIG="/etc/moltbot/moltbot.default.json"
 CONFIG_FILE="$MOLTBOT_STATE_DIR/moltbot.json"
 
@@ -94,6 +98,9 @@ GRADIENTEOF
      '. * $gradient | .models.providers.gradient.apiKey = $apiKey' \
      "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 fi
+
+# Ensure moltbot owns all state files
+chown -R moltbot:moltbot "$MOLTBOT_STATE_DIR"
 
 echo "[generate-config] Final config:"
 jq '.' "$CONFIG_FILE"

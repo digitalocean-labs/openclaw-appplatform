@@ -1,4 +1,6 @@
 #!/command/with-contenv bash
+# Tailscale daemon (required for networking)
 
-# Run containerboot to configure tailscale for container usage
-/usr/local/bin/containerboot
+echo "[tailscale] Starting Tailscale daemon..."
+
+exec s6-setuidgid moltbot /usr/local/bin/containerboot
