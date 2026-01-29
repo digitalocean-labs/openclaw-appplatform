@@ -7,8 +7,9 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 ## Features
 
 - **Fast boot** (~30 seconds vs 5-10 min source build)
-- **Auto-update** on every container start
+- **Flexible networking** - Tailscale (private) or LAN (public) modes
 - **Optional persistence** via Litestream + DO Spaces
+- **Gradient AI support** - Use DigitalOcean's serverless AI inference
 - **Multi-arch** support (amd64/arm64)
 
 ## Quick Start
@@ -22,12 +23,15 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│           GHCR Image: ghcr.io/bikramkgupta/                 │
+│           GHCR Image: ghcr.io/bikramkgupta/                      │
 │                    clawdbot-appplatform                          │
 │  ┌───────────┐  ┌───────────┐  ┌────────────────────────────┐   │
 │  │ Node 24   │  │ Clawdbot  │  │ Litestream (optional)      │   │
 │  │ (slim)    │  │ (latest)  │  │ SQLite → DO Spaces backup  │   │
 │  └───────────┘  └───────────┘  └────────────────────────────┘   │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ Tailscale (optional) - Private networking via tailnet    │  │
+│  └───────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -44,6 +48,39 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 | Variable | Description |
 |----------|-------------|
 | `CLAWDBOT_GATEWAY_TOKEN` | Admin token for gateway API access |
+
+### Gateway Mode
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CLAWDBOT_GATEWAY_MODE` | `tailscale` or `lan` | `tailscale` |
+| `PORT` | HTTP port (LAN mode only) | `8080` |
+
+**Tailscale mode** (default): Access via your private tailnet. Requires:
+- `TS_AUTHKEY` - Tailscale auth key
+- Deploy as a **worker** (not service)
+
+**LAN mode**: Public HTTP access behind Cloudflare/App Platform proxy. Requires:
+- `SETUP_PASSWORD` for password auth, or uses token auth
+
+### Optional (Gradient AI)
+
+| Variable | Description |
+|----------|-------------|
+| `GRADIENT_API_KEY` | DigitalOcean Gradient AI Model Access Key |
+
+When set, adds Gradient as a model provider with access to:
+- Llama 3.3 70B Instruct
+- Claude 4.5 Sonnet
+- Claude Opus 4.5
+- DeepSeek R1 Distill Llama 70B
+
+### Optional (Tailscale)
+
+| Variable | Description |
+|----------|-------------|
+| `TS_AUTHKEY` | Tailscale auth key for joining your tailnet |
+| `TS_HOSTNAME` | Hostname on your tailnet |
 
 ### Optional (Persistence)
 
@@ -139,6 +176,16 @@ During operation:
 - Litestream continuously replicates SQLite changes (1s sync interval)
 - JSON state is backed up every 5 minutes
 - On graceful shutdown (SIGTERM), final state backup is saved
+
+## Tailscale Setup
+
+For private access via Tailscale instead of public HTTP:
+
+1. Set `CLAWDBOT_GATEWAY_MODE=tailscale`
+2. Create a Tailscale auth key at https://login.tailscale.com/admin/settings/keys
+3. Set `TS_AUTHKEY` to your auth key
+4. Deploy as a **worker** (use `.do/deploy.template.yaml`)
+5. Access via `https://clawdbot.<your-tailnet>.ts.net`
 
 ## Documentation
 
