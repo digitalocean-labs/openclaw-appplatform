@@ -2,4 +2,11 @@
 # Tailscale daemon (required for networking)
 
 echo "[tailscale] Starting Tailscale daemon..."
+
+# Set operator once daemon is ready (background task)
+(
+  sleep 5
+  tailscale set --operator=moltbot 2>/dev/null && echo "[tailscale] Operator set to moltbot"
+) &
+
 exec /usr/local/bin/containerboot

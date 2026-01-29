@@ -1,0 +1,8 @@
+# Restic backup scheduled tasks
+# Note: Tasks check for persistence config and skip if not configured
+
+# Backup every 5 minutes
+*/5 * * * * root /usr/local/bin/restic-backup --quiet
+
+# Prune daily at 3am
+0 3 * * * root /usr/local/bin/restic-prune --quiet

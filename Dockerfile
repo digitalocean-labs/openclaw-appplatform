@@ -9,7 +9,7 @@ COPY --from=tailscale /usr/local/bin/tailscaled /usr/local/bin/tailscaled
 COPY --from=tailscale /usr/local/bin/containerboot /usr/local/bin/containerboot
 
 ARG TARGETARCH
-ARG MOLTBOT_VERSION=latest
+ARG MOLTBOT_VERSION=2026.1.27-beta.1
 ARG LITESTREAM_VERSION=0.5.6
 ARG S6_OVERLAY_VERSION=3.2.1.0
 ARG NODE_MAJOR=24
@@ -37,6 +37,7 @@ RUN set -eux; \
       git \
       bzip2 \
       openssh-server \
+      cron \
       xz-utils; \
     # Install Node.js from NodeSource
     mkdir -p /etc/apt/keyrings; \

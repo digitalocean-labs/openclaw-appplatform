@@ -168,7 +168,7 @@ apt-get update && apt-get install -y vim htop
 **Notes:**
 - Use `#!/command/with-contenv bash` to inherit environment variables
 - Scripts run as root
-- Built-in scripts use `10-` and `20-` prefixes; use `30-` or higher for custom scripts
+- Built-in scripts use `00-` through `20-` prefixes; use `30-` or higher for custom scripts
 
 ### Custom Services (`services.d`)
 
@@ -194,7 +194,19 @@ exec my-daemon --foreground
 | `tailscale` | Tailscale daemon (required) |
 | `moltbot` | Moltbot gateway |
 | `sshd` | SSH server (if `ENABLE_SSH=true`) |
-| `backup` | Periodic state backup (if persistence configured) |
+| `crond` | Cron daemon for scheduled backups |
+| `litestream` | SQLite replication (if persistence configured) |
+
+### Built-in Init Scripts
+
+| Script | Description |
+|--------|-------------|
+| `00-set-hostname` | Sets hostname from `TS_HOSTNAME` |
+| `05-setup-restic` | Configures restic for DO Spaces backup |
+| `06-restore-packages` | Restores user-installed packages from backup |
+| `10-restore-state` | Restores state paths from restic backup |
+| `15-restore-sqlite` | Restores SQLite via Litestream |
+| `20-generate-config` | Generates moltbot.json from environment |
 
 ### General Notes
 
@@ -211,8 +223,9 @@ App Platform doesn't have persistent volumes, so this image uses DO Spaces for s
 | Data Type | Backup Method | Description |
 |-----------|--------------|-------------|
 | Memory search index | Litestream (real-time) | SQLite database for vector search |
-| Config, devices, sessions | S3 backup (every 5 min) | JSON state files |
-| Tailscale state | S3 backup (every 5 min) | Auth keys and node identity |
+| Config, devices, sessions | Restic (every 5 min) | JSON state files |
+| Tailscale state | Restic (every 5 min) | Auth keys and node identity |
+| User-installed packages | Restic (every 5 min) | dpkg selections for apt packages |
 
 ### Setup Steps
 
@@ -237,14 +250,17 @@ App Platform doesn't have persistent volumes, so this image uses DO Spaces for s
 ### How It Works
 
 On startup:
-1. Restores JSON state backup from Spaces (if exists)
-2. Restores Tailscale state from Spaces (if exists)
-3. Restores SQLite memory database via Litestream (if exists)
-4. Starts the gateway
+1. Sets hostname from `TS_HOSTNAME` (if provided)
+2. Configures restic for DO Spaces
+3. Restores and reinstalls user-installed packages (if backed up)
+4. Restores state paths via restic (config, tailscale, etc.)
+5. Restores SQLite via Litestream (if exists)
+6. Generates gateway config and starts services
 
 During operation:
 - Litestream continuously replicates SQLite changes (1s sync interval)
-- JSON state and Tailscale state are backed up every 5 minutes
+- Cron runs restic backup every 5 minutes
+- Cron runs restic prune daily at 3am (per-host retention)
 - On graceful shutdown (SIGTERM), final state backup is saved
 
 ## Tailscale Setup

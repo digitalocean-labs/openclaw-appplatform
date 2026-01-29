@@ -9,10 +9,15 @@ repository: "s3:${SPACES_ENDPOINT}/${SPACES_BUCKET}/restic"
 # Order matters for restore: /etc is restored first after packages
 paths:
   - path: /etc
-    exclude:
-      - "moltbot/backup.yaml"  # Don't backup the backup config itself
-
   - path: /data/.moltbot
+    exclude:
+      - "memory/*"
+      - "*.sqlite*"
+      - "*.db*"
+      - "gateway.*.lock"
+
+  # Include the legacy .clawdbot directory for backwards compatibility
+  - path: /data/.clawdbot
     exclude:
       - "memory/*"
       - "*.sqlite*"

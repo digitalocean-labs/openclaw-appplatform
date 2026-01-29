@@ -1,0 +1,9 @@
+#!/command/with-contenv bash
+# Set container hostname from TS_HOSTNAME
+
+if [ -n "$TS_HOSTNAME" ]; then
+  echo "[set-hostname] Setting hostname to: $TS_HOSTNAME"
+  hostname "$TS_HOSTNAME" 2>/dev/null || echo "[set-hostname] Warning: Could not set hostname"
+else
+  echo "[set-hostname] TS_HOSTNAME not set, keeping default hostname"
+fi

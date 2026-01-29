@@ -1,8 +1,72 @@
 #!/command/with-contenv bash
-# Restore state from restic backup
+# Restore state paths from restic backup
+
+# Source s6 container environment (needed for cont-init scripts)
+for f in /run/s6/container_environment/*; do
+  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
+done
+
+CONFIG_FILE="/etc/moltbot/backup.yaml"
 
 # Ensure directories exist
 mkdir -p "$MOLTBOT_STATE_DIR" "$MOLTBOT_WORKSPACE_DIR" "$TS_STATE_DIR"
 
-# Run unified restore script
-/usr/local/bin/restic-restore
+# Check if persistence is configured
+if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
+  echo "[restore-state] Persistence not configured, skipping"
+  exit 0
+fi
+
+# Check if config exists
+if [ ! -f "$CONFIG_FILE" ]; then
+  echo "[restore-state] Config file not found: $CONFIG_FILE"
+  exit 1
+fi
+
+# Check if repository has any snapshots
+if ! restic snapshots --latest 1 2>/dev/null | grep -q .; then
+  echo "[restore-state] No snapshots found in repository, skipping"
+  exit 0
+fi
+
+# Restore all paths in order (config has /etc first)
+PATH_COUNT=$(yq -r '.paths | length' "$CONFIG_FILE")
+
+if [ "$PATH_COUNT" -eq 0 ]; then
+  echo "[restore-state] No paths configured for restore"
+  exit 0
+fi
+
+echo "[restore-state] Restoring $PATH_COUNT paths..."
+
+for i in $(seq 0 $((PATH_COUNT - 1))); do
+  RESTORE_PATH=$(yq -r ".paths[$i].path" "$CONFIG_FILE")
+  
+  # Ensure parent directory exists
+  mkdir -p "$(dirname "$RESTORE_PATH")"
+  
+  # Find latest snapshot for this specific path, excluding current container
+  CURRENT_HOSTNAME=$(hostname)
+  SNAPSHOT_ID=$(restic snapshots --path "$RESTORE_PATH" --json 2>/dev/null | jq -r --arg host "$CURRENT_HOSTNAME" '[.[] | select(.hostname != $host)] | sort_by(.time) | reverse | .[0].id // empty')
+  
+  if [ -z "$SNAPSHOT_ID" ]; then
+    echo "[restore-state] No snapshot found for $RESTORE_PATH, skipping"
+    continue
+  fi
+  
+  echo "[restore-state] Restoring: $RESTORE_PATH (snapshot $SNAPSHOT_ID)"
+  
+  # Run restic restore from the snapshot that contains this path
+  if restic restore "$SNAPSHOT_ID" --target / --include "$RESTORE_PATH" 2>&1; then
+    echo "[restore-state] Completed: $RESTORE_PATH"
+  else
+    echo "[restore-state] Warning: Restore may have had issues for $RESTORE_PATH (continuing)"
+  fi
+done
+
+# Fix ownership on moltbot directories (restored as root, needs moltbot user)
+if [ -d "$MOLTBOT_STATE_DIR" ]; then
+  chown -R moltbot:moltbot "$MOLTBOT_STATE_DIR"
+fi
+
+echo "[restore-state] Restore complete"

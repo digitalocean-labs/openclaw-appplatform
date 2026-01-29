@@ -1,6 +1,11 @@
 #!/command/with-contenv bash
 # Periodic prune service using restic
 
+# Source s6 container environment (ensures vars are available)
+for f in /run/s6/container_environment/*; do
+  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
+done
+
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 
 # Skip if persistence not configured

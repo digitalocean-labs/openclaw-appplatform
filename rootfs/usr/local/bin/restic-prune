@@ -1,8 +1,13 @@
-#!/command/with-contenv bash
+#!/bin/bash
 # Prune old snapshots using restic forget
 # Reads retention policy from /etc/moltbot/backup.yaml
 
 set -e
+
+# Source s6 container environment (required for cron which doesn't inherit env)
+for f in /run/s6/container_environment/*; do
+  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
+done
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 QUIET=""
@@ -45,8 +50,12 @@ KEEP_MONTHLY=$(yq -r '.retention.keep_monthly // 6' "$CONFIG_FILE")
 
 log "Starting prune with retention: last=$KEEP_LAST hourly=$KEEP_HOURLY daily=$KEEP_DAILY weekly=$KEEP_WEEKLY monthly=$KEEP_MONTHLY"
 
-# Run restic forget with prune
+# Run restic forget with prune (only for this host's snapshots)
+CURRENT_HOSTNAME=$(hostname)
+log "Pruning snapshots for host: $CURRENT_HOSTNAME"
+
 restic forget --prune \
+  --host "$CURRENT_HOSTNAME" \
   --keep-last "$KEEP_LAST" \
   --keep-hourly "$KEEP_HOURLY" \
   --keep-daily "$KEEP_DAILY" \

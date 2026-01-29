@@ -1,8 +1,13 @@
-#!/command/with-contenv bash
+#!/bin/bash
 # Unified backup script using restic
 # Reads configuration from /etc/moltbot/backup.yaml
 
 set -e
+
+# Source s6 container environment (required for cron which doesn't inherit env)
+for f in /run/s6/container_environment/*; do
+  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
+done
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 QUIET=""

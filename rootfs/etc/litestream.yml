@@ -6,7 +6,7 @@ dbs:
       - type: s3
         endpoint: https://${SPACES_ENDPOINT}
         bucket: ${SPACES_BUCKET}
-        path: moltbot/db/memory-main
+        path: ${TS_HOSTNAME}/moltbot/db/memory-main
         access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
         secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
         sync-interval: 1s

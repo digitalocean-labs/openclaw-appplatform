@@ -1,0 +1,51 @@
+#!/command/with-contenv bash
+# Restore and reinstall user-installed packages from backup
+
+CONFIG_FILE="/etc/moltbot/backup.yaml"
+DPKG_SELECTIONS="/etc/moltbot/dpkg-selections"
+
+# Source s6 container environment
+for f in /run/s6/container_environment/*; do
+  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
+done
+
+# Check if persistence is configured
+if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
+  echo "[restore-packages] Persistence not configured, skipping"
+  exit 0
+fi
+
+# Check if repository has any snapshots
+if ! restic snapshots --latest 1 2>/dev/null | grep -q .; then
+  echo "[restore-packages] No snapshots found, skipping"
+  exit 0
+fi
+
+# Step 1: Restore dpkg-selections file first (from globally latest /etc snapshot, excluding current container)
+CURRENT_HOSTNAME=$(hostname)
+ETC_SNAPSHOT=$(restic snapshots --path /etc --json 2>/dev/null | jq -r --arg host "$CURRENT_HOSTNAME" '[.[] | select(.hostname != $host)] | sort_by(.time) | reverse | .[0].id // empty')
+if [ -n "$ETC_SNAPSHOT" ]; then
+  echo "[restore-packages] Restoring package selections from snapshot $ETC_SNAPSHOT..."
+  if restic restore "$ETC_SNAPSHOT" --target / --include "$DPKG_SELECTIONS" 2>&1; then
+    echo "[restore-packages] Package selections restored"
+  else
+    echo "[restore-packages] Warning: Could not restore package selections (continuing)"
+  fi
+else
+  echo "[restore-packages] No /etc snapshot found, skipping package selections restore"
+fi
+
+# Step 2: Reinstall packages if selections file exists
+if [ -f "$DPKG_SELECTIONS" ]; then
+  echo "[restore-packages] Reinstalling packages from saved selections..."
+  # Update apt cache
+  apt-get update -qq
+  # Sync dpkg's available database with apt's cache (required for dselect-upgrade)
+  apt-cache dumpavail | dpkg --update-avail -
+  # Now set selections and install
+  dpkg --set-selections < "$DPKG_SELECTIONS"
+  apt-get dselect-upgrade -y -qq || echo "[restore-packages] Warning: Some packages may have failed to install"
+  echo "[restore-packages] Package reinstallation complete"
+else
+  echo "[restore-packages] No package selections found, skipping"
+fi
