@@ -56,8 +56,6 @@ RUN set -eux; \
 COPY entrypoint.sh /entrypoint.sh
 COPY litestream.yml /etc/litestream.yml
 COPY moltbot.default.json /etc/clawdbot/moltbot.default.json
-COPY configs/ssh_config.d/ /etc/ssh/ssh_config.d/
-COPY configs/sshd_config.d/ /etc/ssh/sshd_config.d/
 RUN chmod +x /entrypoint.sh
 
 # Create non-root user with sudo access and SSH capability
@@ -86,6 +84,19 @@ RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.co
 # Install pnpm and clawdbot
 RUN brew install pnpm \
     && pnpm add -g "clawdbot@${CLAWDBOT_VERSION}"
+
+# Switch back to root for final overlay
+USER root
+
+# Apply rootfs overlay - allows users to add/override any files
+# This is done last so user customizations take precedence
+COPY rootfs/ /
+
+# Fix ownership for any files copied to clawdbot's home
+RUN chown -R clawdbot:clawdbot /home/clawdbot 2>/dev/null || true
+
+# Switch back to clawdbot for runtime
+USER clawdbot
 
 # Expose ports: 8080 for LAN mode, 22 for SSH
 EXPOSE 8080 22
