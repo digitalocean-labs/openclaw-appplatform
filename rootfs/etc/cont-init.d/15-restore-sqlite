@@ -13,7 +13,7 @@ echo "[restore-sqlite] Restoring SQLite from Litestream..."
 mkdir -p "$MOLTBOT_STATE_DIR/memory"
 
 # Restore the database if replica exists
-litestream restore -if-replica-exists -config /etc/litestream.yml \
+exec s6-setuidgid moltbot litestream restore -if-replica-exists -config /etc/litestream.yml \
   "$MOLTBOT_STATE_DIR/memory/main.sqlite" || true
 
 echo "[restore-sqlite] SQLite restore complete"

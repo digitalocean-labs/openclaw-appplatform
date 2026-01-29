@@ -1,0 +1,5 @@
+#!/command/with-contenv bash
+# Import SSH keys from GitHub
+
+# This imports the SSH keys from the GitHub username into the SSH agent for the root user
+ssh-import-id-gh "$GITHUB_USERNAME"

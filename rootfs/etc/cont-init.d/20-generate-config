@@ -3,6 +3,9 @@
 
 set -e
 
+# Source moltbot profile for PATH setup
+. /home/moltbot/.profile
+
 # Ensure state directory exists with correct ownership
 mkdir -p "$MOLTBOT_STATE_DIR"
 chown moltbot:moltbot "$MOLTBOT_STATE_DIR"

@@ -24,7 +24,7 @@ if [ -z "$RESTIC_PASSWORD" ]; then
   if [ -f "$MOLTBOT_STATE_DIR/.restic-password" ]; then
     RESTIC_PASSWORD=$(cat "$MOLTBOT_STATE_DIR/.restic-password")
   else
-    RESTIC_PASSWORD=$(openssl rand -base64 32)
+    RESTIC_PASSWORD="$RESTIC_PASSWORD"
     mkdir -p "$MOLTBOT_STATE_DIR"
     echo "$RESTIC_PASSWORD" > "$MOLTBOT_STATE_DIR/.restic-password"
     chmod 600 "$MOLTBOT_STATE_DIR/.restic-password"

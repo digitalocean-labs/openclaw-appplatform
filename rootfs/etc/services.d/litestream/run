@@ -11,4 +11,4 @@ fi
 echo "[litestream] Starting SQLite replication..."
 
 # Run litestream replicate (continuous replication)
-exec s6-setuidgid moltbot exec litestream replicate -config /etc/litestream.yml
+exec s6-setuidgid moltbot litestream replicate -config /etc/litestream.yml

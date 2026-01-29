@@ -3,5 +3,5 @@
 
 echo "[moltbot] Starting moltbot gateway..."
 
-# Run gateway directly (litestream runs as separate service)
-exec s6-setuidgid moltbot moltbot gateway --allow-unconfigured
+# Source profile and run gateway (litestream runs as separate service)
+exec s6-setuidgid moltbot bash -l -c 'exec moltbot gateway --allow-unconfigured'

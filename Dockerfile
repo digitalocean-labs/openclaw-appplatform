@@ -31,6 +31,7 @@ RUN set -eux; \
       wget \
       curl \
       gnupg \
+      ssh-import-id \
       openssl \
       jq \
       sudo \
@@ -88,21 +89,23 @@ RUN useradd -m -d /home/moltbot -s /bin/bash moltbot \
     && chmod 700 /home/moltbot/.ssh \
     && chown moltbot:moltbot /home/moltbot/.ssh
 
-# Homebrew and pnpm paths
-ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
+# nvm and pnpm paths
+ENV NVM_DIR="/home/moltbot/.nvm"
 ENV PNPM_HOME="/home/moltbot/.local/share/pnpm"
 ENV PATH="${PNPM_HOME}:${PATH}"
 
-# Create pnpm directory
+# Create directories
 RUN mkdir -p ${PNPM_HOME} && chown -R moltbot:moltbot /home/moltbot/.local
 
 USER moltbot
 
-# Install Homebrew (must run as non-root)
-RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install pnpm and moltbot
-RUN brew install pnpm \
+# Install nvm, Node.js LTS, pnpm, and moltbot
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash \
+    && . "$NVM_DIR/nvm.sh" \
+    && nvm install --lts \
+    && nvm use --lts \
+    && nvm alias default lts/* \
+    && npm install -g pnpm \
     && pnpm add -g "moltbot@${MOLTBOT_VERSION}"
 
 # Switch back to root for final overlay
