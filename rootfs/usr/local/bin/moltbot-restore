@@ -1,0 +1,92 @@
+#!/command/with-contenv bash
+# Unified restore script for moltbot state
+# Usage: moltbot-restore [--quiet]
+
+QUIET=${1:-}
+
+log() {
+  if [ "$QUIET" != "--quiet" ]; then
+    echo "[restore] $1"
+  fi
+}
+
+# Ensure directories exist
+mkdir -p "$MOLTBOT_STATE_DIR" "$MOLTBOT_WORKSPACE_DIR" "$MOLTBOT_STATE_DIR/memory" "$TS_STATE_DIR"
+
+# Skip if persistence not configured
+if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
+  log "Persistence not configured, skipping restore"
+  exit 0
+fi
+
+log "Restoring state from Spaces backup..."
+
+# Ensure s3cmd config exists
+if [ ! -f /tmp/.s3cfg ]; then
+  cat > /tmp/.s3cfg << EOF
+[default]
+access_key = ${LITESTREAM_ACCESS_KEY_ID}
+secret_key = ${LITESTREAM_SECRET_ACCESS_KEY}
+host_base = ${SPACES_ENDPOINT}
+host_bucket = %(bucket)s.${SPACES_ENDPOINT}
+use_https = True
+EOF
+  chmod 600 /tmp/.s3cfg
+fi
+
+# Restore moltbot state
+restore_moltbot_state() {
+  STATE_BACKUP_PATH="s3://${SPACES_BUCKET}/moltbot/state-backup.tar.gz"
+  if s3cmd -c /tmp/.s3cfg ls "$STATE_BACKUP_PATH" 2>/dev/null | grep -q state-backup; then
+    log "Downloading moltbot state backup..."
+    s3cmd -c /tmp/.s3cfg get "$STATE_BACKUP_PATH" /tmp/state-backup.tar.gz && \
+      tar -xzf /tmp/state-backup.tar.gz -C "$MOLTBOT_STATE_DIR" || \
+      log "Warning: failed to restore moltbot state backup (continuing)"
+    rm -f /tmp/state-backup.tar.gz
+  else
+    log "No moltbot state backup found (first deployment)"
+  fi
+}
+
+# Restore Tailscale state
+restore_tailscale_state() {
+  TS_BACKUP_PATH="s3://${SPACES_BUCKET}/moltbot/tailscale-state.tar.gz"
+  if s3cmd -c /tmp/.s3cfg ls "$TS_BACKUP_PATH" 2>/dev/null | grep -q tailscale-state; then
+    log "Downloading Tailscale state backup..."
+    s3cmd -c /tmp/.s3cfg get "$TS_BACKUP_PATH" /tmp/tailscale-state.tar.gz && \
+      tar -xzf /tmp/tailscale-state.tar.gz -C "$TS_STATE_DIR" || \
+      log "Warning: failed to restore Tailscale state backup (continuing)"
+    rm -f /tmp/tailscale-state.tar.gz
+  else
+    log "No Tailscale state backup found (first deployment)"
+  fi
+}
+
+# Restore home directories (includes dotfiles)
+restore_home_dirs() {
+  HOME_BACKUP_PATH="s3://${SPACES_BUCKET}/moltbot/home-backup.tar.gz"
+  if s3cmd -c /tmp/.s3cfg ls "$HOME_BACKUP_PATH" 2>/dev/null | grep -q home-backup; then
+    log "Downloading home directories backup..."
+    s3cmd -c /tmp/.s3cfg get "$HOME_BACKUP_PATH" /tmp/home-backup.tar.gz && \
+      tar -xzf /tmp/home-backup.tar.gz -C /home || \
+      log "Warning: failed to restore home backup (continuing)"
+    rm -f /tmp/home-backup.tar.gz
+  else
+    log "No home backup found (first deployment)"
+  fi
+}
+
+# Restore SQLite memory database via Litestream
+restore_sqlite() {
+  log "Restoring SQLite from Litestream..."
+  litestream restore -if-replica-exists -config /etc/litestream.yml \
+    "$MOLTBOT_STATE_DIR/memory/main.sqlite" || true
+}
+
+# Run all restores
+restore_moltbot_state
+restore_tailscale_state
+restore_home_dirs
+restore_sqlite
+
+log "Restore complete"
