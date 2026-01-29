@@ -1,11 +1,41 @@
 #!/command/with-contenv bash
 # Unified backup script for moltbot state
-# Usage: moltbot-backup [--quiet]
+# Usage: 
+#   moltbot-backup                    # Backup all default paths
+#   moltbot-backup --path /some/dir   # Backup specific path
+#   moltbot-backup --quiet            # Suppress output
 
-QUIET=${1:-}
+set -e
+
+QUIET=""
+CUSTOM_PATH=""
+EXCLUDE_ARGS=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --quiet|-q)
+      QUIET="true"
+      shift
+      ;;
+    --path|-p)
+      CUSTOM_PATH="$2"
+      shift 2
+      ;;
+    --exclude|-e)
+      EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Usage: moltbot-backup [--quiet] [--path /some/dir] [--exclude pattern]"
+      exit 1
+      ;;
+  esac
+done
 
 log() {
-  if [ "$QUIET" != "--quiet" ]; then
+  if [ "$QUIET" != "true" ]; then
     echo "[backup] $1"
   fi
 }
@@ -17,8 +47,9 @@ if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
 fi
 
 # Ensure s3cmd config exists
-if [ ! -f /tmp/.s3cfg ]; then
-  cat > /tmp/.s3cfg << EOF
+ensure_s3cfg() {
+  if [ ! -f /tmp/.s3cfg ]; then
+    cat > /tmp/.s3cfg << EOF
 [default]
 access_key = ${LITESTREAM_ACCESS_KEY_ID}
 secret_key = ${LITESTREAM_SECRET_ACCESS_KEY}
@@ -26,73 +57,61 @@ host_base = ${SPACES_ENDPOINT}
 host_bucket = %(bucket)s.${SPACES_ENDPOINT}
 use_https = True
 EOF
-  chmod 600 /tmp/.s3cfg
+    chmod 600 /tmp/.s3cfg
+  fi
+}
+
+# Backup a single path
+# Args: $1 = source path, $2 = s3 key name, $3 = extra exclude args (optional)
+backup_path() {
+  local src_path="$1"
+  local key_name="$2"
+  local extra_excludes="${3:-}"
+  
+  if [ ! -d "$src_path" ]; then
+    log "Path $src_path does not exist, skipping"
+    return 0
+  fi
+  
+  log "Backing up $src_path..."
+  cd "$src_path"
+  
+  # Build tar command
+  tar -czf "/tmp/${key_name}.tar.gz" \
+    $extra_excludes \
+    $EXCLUDE_ARGS \
+    --ignore-failed-read \
+    . 2>/dev/null || true
+
+  if [ -f "/tmp/${key_name}.tar.gz" ]; then
+    s3cmd -c /tmp/.s3cfg put "/tmp/${key_name}.tar.gz" \
+      "s3://${SPACES_BUCKET}/moltbot/${key_name}.tar.gz" && \
+      log "$src_path uploaded as ${key_name}.tar.gz" || \
+      log "Warning: $src_path upload failed"
+    rm -f "/tmp/${key_name}.tar.gz"
+  fi
+}
+
+# Generate key name from path (e.g., /home/moltbot -> home-moltbot-backup)
+path_to_key() {
+  local path="$1"
+  # Remove leading slash, replace remaining slashes with dashes
+  echo "${path#/}" | tr '/' '-' | sed 's/-*$//'
+}
+
+ensure_s3cfg
+
+# If custom path specified, backup just that
+if [ -n "$CUSTOM_PATH" ]; then
+  key_name="$(path_to_key "$CUSTOM_PATH")-backup"
+  backup_path "$CUSTOM_PATH" "$key_name"
+  log "Backup complete"
+  exit 0
 fi
 
-# Backup moltbot state
-backup_moltbot_state() {
-  log "Backing up moltbot state..."
-  cd "$MOLTBOT_STATE_DIR"
-  tar -czf /tmp/state-backup.tar.gz \
-    --exclude='memory' \
-    --exclude='*.sqlite*' \
-    --exclude='*.db*' \
-    --exclude='gateway.*.lock' \
-    --ignore-failed-read \
-    . 2>/dev/null || true
-
-  if [ -f /tmp/state-backup.tar.gz ]; then
-    s3cmd -c /tmp/.s3cfg put /tmp/state-backup.tar.gz \
-      "s3://${SPACES_BUCKET}/moltbot/state-backup.tar.gz" && \
-      log "Moltbot state uploaded" || \
-      log "Warning: moltbot state upload failed"
-    rm -f /tmp/state-backup.tar.gz
-  fi
-}
-
-# Backup Tailscale state
-backup_tailscale_state() {
-  if [ -d "$TS_STATE_DIR" ]; then
-    log "Backing up Tailscale state..."
-    cd "$TS_STATE_DIR"
-    tar -czf /tmp/tailscale-state.tar.gz \
-      --ignore-failed-read \
-      . 2>/dev/null || true
-
-    if [ -f /tmp/tailscale-state.tar.gz ]; then
-      s3cmd -c /tmp/.s3cfg put /tmp/tailscale-state.tar.gz \
-        "s3://${SPACES_BUCKET}/moltbot/tailscale-state.tar.gz" && \
-        log "Tailscale state uploaded" || \
-        log "Warning: Tailscale state upload failed"
-      rm -f /tmp/tailscale-state.tar.gz
-    fi
-  fi
-}
-
-# Backup home directories (includes dotfiles)
-backup_home_dirs() {
-  log "Backing up home directories..."
-  cd /home
-  tar -czf /tmp/home-backup.tar.gz \
-    --exclude='*/.cache' \
-    --exclude='*/.npm/_cacache' \
-    --exclude='*/.local/share/pnpm/store' \
-    --exclude='*/node_modules' \
-    --ignore-failed-read \
-    . 2>/dev/null || true
-
-  if [ -f /tmp/home-backup.tar.gz ]; then
-    s3cmd -c /tmp/.s3cfg put /tmp/home-backup.tar.gz \
-      "s3://${SPACES_BUCKET}/moltbot/home-backup.tar.gz" && \
-      log "Home directories uploaded" || \
-      log "Warning: home backup upload failed"
-    rm -f /tmp/home-backup.tar.gz
-  fi
-}
-
-# Run all backups
-backup_moltbot_state
-backup_tailscale_state
-backup_home_dirs
+# Default: backup all known paths
+backup_path "$MOLTBOT_STATE_DIR" "state-backup" "--exclude=memory --exclude=*.sqlite* --exclude=*.db* --exclude=gateway.*.lock"
+backup_path "$TS_STATE_DIR" "tailscale-state"
+backup_path "/home" "home-backup" "--exclude=*/.cache --exclude=*/.npm/_cacache --exclude=*/.local/share/pnpm/store --exclude=*/node_modules"
 
 log "Backup complete"
