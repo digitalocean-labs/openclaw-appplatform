@@ -86,14 +86,6 @@ restore_path() {
   fi
 }
 
-# Restore SQLite memory database via Litestream
-restore_sqlite() {
-  log "Restoring SQLite from Litestream..."
-  mkdir -p "$MOLTBOT_STATE_DIR/memory"
-  litestream restore -if-replica-exists -config /etc/litestream.yml \
-    "$MOLTBOT_STATE_DIR/memory/main.sqlite" || true
-}
-
 ensure_s3cfg
 
 # If custom path specified, restore just that
@@ -110,6 +102,5 @@ mkdir -p "$MOLTBOT_STATE_DIR" "$MOLTBOT_WORKSPACE_DIR" "$TS_STATE_DIR"
 restore_path "$MOLTBOT_STATE_DIR"
 restore_path "$TS_STATE_DIR"
 restore_path "/home"
-restore_sqlite
 
 log "Restore complete"

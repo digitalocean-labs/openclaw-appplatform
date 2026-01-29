@@ -1,0 +1,14 @@
+#!/command/with-contenv bash
+# Litestream SQLite replication service
+
+# Skip if persistence not configured
+if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
+  echo "[litestream] Persistence not configured, service disabled"
+  s6-svc -Od .
+  exit 0
+fi
+
+echo "[litestream] Starting SQLite replication..."
+
+# Run litestream replicate (continuous replication)
+exec litestream replicate -config /etc/litestream.yml

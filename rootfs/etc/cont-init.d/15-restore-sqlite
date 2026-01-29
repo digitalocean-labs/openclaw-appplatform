@@ -1,0 +1,19 @@
+#!/command/with-contenv bash
+# Restore SQLite databases via Litestream
+
+# Skip if persistence not configured
+if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
+  echo "[restore-sqlite] Persistence not configured, skipping"
+  exit 0
+fi
+
+echo "[restore-sqlite] Restoring SQLite from Litestream..."
+
+# Ensure directory exists
+mkdir -p "$MOLTBOT_STATE_DIR/memory"
+
+# Restore the database if replica exists
+litestream restore -if-replica-exists -config /etc/litestream.yml \
+  "$MOLTBOT_STATE_DIR/memory/main.sqlite" || true
+
+echo "[restore-sqlite] SQLite restore complete"
