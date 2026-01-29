@@ -1,5 +1,5 @@
 #!/command/with-contenv bash
-# Periodic backup to DO Spaces (every 30 seconds)
+# Periodic backup service
 
 # Skip if persistence not configured
 if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
@@ -8,85 +8,11 @@ if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
   exit 0
 fi
 
-echo "[backup] Starting backup loop (every 30 seconds)..."
-
-# Ensure s3cmd config exists
-cat > /tmp/.s3cfg << EOF
-[default]
-access_key = ${LITESTREAM_ACCESS_KEY_ID}
-secret_key = ${LITESTREAM_SECRET_ACCESS_KEY}
-host_base = ${SPACES_ENDPOINT}
-host_bucket = %(bucket)s.${SPACES_ENDPOINT}
-use_https = True
-EOF
-chmod 600 /tmp/.s3cfg
-
-backup_moltbot_state() {
-  echo "[backup] Backing up moltbot state..."
-  cd "$MOLTBOT_STATE_DIR"
-  # Use find to ensure dotfiles are included
-  tar -czf /tmp/state-backup.tar.gz \
-    --exclude='memory' \
-    --exclude='*.sqlite*' \
-    --exclude='*.db*' \
-    --exclude='gateway.*.lock' \
-    --ignore-failed-read \
-    . 2>/dev/null || true
-
-  if [ -f /tmp/state-backup.tar.gz ]; then
-    s3cmd -c /tmp/.s3cfg put /tmp/state-backup.tar.gz \
-      "s3://${SPACES_BUCKET}/moltbot/state-backup.tar.gz" && \
-      echo "[backup] Moltbot state uploaded" || \
-      echo "[backup] Warning: moltbot state upload failed"
-    rm -f /tmp/state-backup.tar.gz
-  fi
-}
-
-backup_tailscale_state() {
-  if [ -d "$TS_STATE_DIR" ]; then
-    echo "[backup] Backing up Tailscale state..."
-    cd "$TS_STATE_DIR"
-    tar -czf /tmp/tailscale-state.tar.gz \
-      --ignore-failed-read \
-      . 2>/dev/null || true
-
-    if [ -f /tmp/tailscale-state.tar.gz ]; then
-      s3cmd -c /tmp/.s3cfg put /tmp/tailscale-state.tar.gz \
-        "s3://${SPACES_BUCKET}/moltbot/tailscale-state.tar.gz" && \
-        echo "[backup] Tailscale state uploaded" || \
-        echo "[backup] Warning: Tailscale state upload failed"
-      rm -f /tmp/tailscale-state.tar.gz
-    fi
-  fi
-}
-
-backup_home_dirs() {
-  echo "[backup] Backing up home directories..."
-  cd /home
-  # Backup all home directories including dotfiles
-  # Exclude cache directories and other non-essential data
-  tar -czf /tmp/home-backup.tar.gz \
-    --exclude='*/.cache' \
-    --exclude='*/.npm/_cacache' \
-    --exclude='*/.local/share/pnpm/store' \
-    --exclude='*/node_modules' \
-    --exclude='*/.linuxbrew' \
-    --ignore-failed-read \
-    . 2>/dev/null || true
-
-  if [ -f /tmp/home-backup.tar.gz ]; then
-    s3cmd -c /tmp/.s3cfg put /tmp/home-backup.tar.gz \
-      "s3://${SPACES_BUCKET}/moltbot/home-backup.tar.gz" && \
-      echo "[backup] Home directories uploaded" || \
-      echo "[backup] Warning: home backup upload failed"
-    rm -f /tmp/home-backup.tar.gz
-  fi
-}
+BACKUP_INTERVAL=${BACKUP_INTERVAL_SECONDS:-300}
+echo "[backup] Starting backup loop (every ${BACKUP_INTERVAL}s)..."
 
 # Main backup loop
 while true; do
-  sleep 30
-  backup_moltbot_state
-  backup_tailscale_state
-  backup_home_dirs
+  sleep "$BACKUP_INTERVAL"
+  /usr/local/bin/moltbot-backup
 done

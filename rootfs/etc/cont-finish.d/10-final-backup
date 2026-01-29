@@ -1,0 +1,6 @@
+#!/command/with-contenv bash
+# Final backup on container shutdown
+
+echo "[final-backup] Container shutting down, saving all state..."
+/usr/local/bin/moltbot-backup
+echo "[final-backup] Complete"
