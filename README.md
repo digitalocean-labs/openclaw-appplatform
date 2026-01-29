@@ -10,6 +10,7 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 - **Flexible networking** - Tailscale (private) or LAN (public) modes
 - **Optional persistence** via Litestream + DO Spaces
 - **Gradient AI support** - Use DigitalOcean's serverless AI inference
+- **SSH access** - Optional SSH server for remote access
 - **Multi-arch** support (amd64/arm64)
 
 ## Quick Start
@@ -23,15 +24,17 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│           GHCR Image: ghcr.io/bikramkgupta/                      │
 │                    clawdbot-appplatform                          │
-│  ┌───────────┐  ┌───────────┐  ┌────────────────────────────┐   │
-│  │ Node 24   │  │ Clawdbot  │  │ Litestream (optional)      │   │
-│  │ (slim)    │  │ (latest)  │  │ SQLite → DO Spaces backup  │   │
-│  └───────────┘  └───────────┘  └────────────────────────────┘   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Tailscale (optional) - Private networking via tailnet    │  │
-│  └───────────────────────────────────────────────────────────┘  │
+│  ┌─────────────┐  ┌───────────┐  ┌──────────────────────────┐   │
+│  │ Ubuntu      │  │ Clawdbot  │  │ Litestream (optional)    │   │
+│  │ Noble+Node  │  │ (latest)  │  │ SQLite → DO Spaces       │   │
+│  └─────────────┘  └───────────┘  └──────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ Tailscale (optional) - Private networking via tailnet      ││
+│  └─────────────────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ SSH Server (optional) - Remote access via ENABLE_SSH=true  ││
+│  └─────────────────────────────────────────────────────────────┘│
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,6 +65,12 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 
 **LAN mode**: Public HTTP access behind Cloudflare/App Platform proxy. Requires:
 - `SETUP_PASSWORD` for password auth, or uses token auth
+
+### Optional (SSH)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ENABLE_SSH` | Start SSH server on port 22 | `false` |
 
 ### Optional (Gradient AI)
 
@@ -134,6 +143,30 @@ doctl apps create --spec app.yaml
 # Set secrets in the DO dashboard
 ```
 
+## Customizing the Image
+
+The `rootfs/` directory allows you to add or override any files in the container. Files are copied to `/` at the end of the Docker build.
+
+### Examples
+
+```
+rootfs/
+├── etc/
+│   ├── ssh/
+│   │   └── sshd_config.d/
+│   │       └── 10-custom.conf     → /etc/ssh/sshd_config.d/10-custom.conf
+│   └── motd                        → /etc/motd
+└── home/
+    └── clawdbot/
+        └── .bashrc                 → /home/clawdbot/.bashrc
+```
+
+### Notes
+
+- Files are copied with `COPY rootfs/ /` which preserves directory structure
+- Existing files in the container will be overwritten
+- File permissions from the source are preserved
+
 ## Setting Up Persistence
 
 App Platform doesn't have persistent volumes, so this image uses DO Spaces for state backup.
@@ -144,6 +177,7 @@ App Platform doesn't have persistent volumes, so this image uses DO Spaces for s
 |-----------|--------------|-------------|
 | Memory search index | Litestream (real-time) | SQLite database for vector search |
 | Config, devices, sessions | S3 backup (every 5 min) | JSON state files |
+| Tailscale state | S3 backup (every 5 min) | Auth keys and node identity |
 
 ### Setup Steps
 
@@ -169,12 +203,13 @@ App Platform doesn't have persistent volumes, so this image uses DO Spaces for s
 
 On startup:
 1. Restores JSON state backup from Spaces (if exists)
-2. Restores SQLite memory database via Litestream (if exists)
-3. Starts the gateway
+2. Restores Tailscale state from Spaces (if exists)
+3. Restores SQLite memory database via Litestream (if exists)
+4. Starts the gateway
 
 During operation:
 - Litestream continuously replicates SQLite changes (1s sync interval)
-- JSON state is backed up every 5 minutes
+- JSON state and Tailscale state are backed up every 5 minutes
 - On graceful shutdown (SIGTERM), final state backup is saved
 
 ## Tailscale Setup
