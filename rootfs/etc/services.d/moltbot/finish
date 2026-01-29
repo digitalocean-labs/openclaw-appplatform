@@ -25,6 +25,7 @@ EOF
     --exclude='*.sqlite*' \
     --exclude='*.db*' \
     --exclude='gateway.*.lock' \
+    --ignore-failed-read \
     . 2>/dev/null || true
 
   if [ -f /tmp/state-backup.tar.gz ]; then
@@ -37,13 +38,33 @@ EOF
   if [ -d "$TS_STATE_DIR" ]; then
     echo "[moltbot] Backing up Tailscale state..."
     cd "$TS_STATE_DIR"
-    tar -czf /tmp/tailscale-state.tar.gz . 2>/dev/null || true
+    tar -czf /tmp/tailscale-state.tar.gz \
+      --ignore-failed-read \
+      . 2>/dev/null || true
 
     if [ -f /tmp/tailscale-state.tar.gz ]; then
       s3cmd -c /tmp/.s3cfg put /tmp/tailscale-state.tar.gz \
         "s3://${SPACES_BUCKET}/moltbot/tailscale-state.tar.gz" || true
       rm -f /tmp/tailscale-state.tar.gz
     fi
+  fi
+
+  # Backup home directories (includes dotfiles)
+  echo "[moltbot] Backing up home directories..."
+  cd /home
+  tar -czf /tmp/home-backup.tar.gz \
+    --exclude='*/.cache' \
+    --exclude='*/.npm/_cacache' \
+    --exclude='*/.local/share/pnpm/store' \
+    --exclude='*/node_modules' \
+    --exclude='*/.linuxbrew' \
+    --ignore-failed-read \
+    . 2>/dev/null || true
+
+  if [ -f /tmp/home-backup.tar.gz ]; then
+    s3cmd -c /tmp/.s3cfg put /tmp/home-backup.tar.gz \
+      "s3://${SPACES_BUCKET}/moltbot/home-backup.tar.gz" || true
+    rm -f /tmp/home-backup.tar.gz
   fi
 
   echo "[moltbot] State backup complete"
