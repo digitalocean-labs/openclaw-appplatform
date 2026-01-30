@@ -1,4 +1,6 @@
 #!/command/with-contenv bash
+set -euo pipefail
+
 # Reinstall Brews for all users (only when persistence is enabled AND Homebrew is installed)
 
 # Skip if Homebrew is not installed
@@ -16,13 +18,13 @@ fi
 
 echo "[reinstall-brews] Reinstalling Brews from restic backup"
 
-# Iterate through all home directories in /home
-for homedir in /home/*; do
-  # Skip if not a directory
-  [ ! -d "$homedir" ] && continue
+# Prefer shared Linuxbrew if present, otherwise fall back to PATH inside user shell
+SHARED_BREW="/home/linuxbrew/.linuxbrew/bin/brew"
 
-  # Get username from path
-  username=$(basename "$homedir")
+for homedir in /home/*; do
+  [ -d "$homedir" ] || continue
+
+  username="$(basename "$homedir")"
 
   # Skip if user doesn't exist
   id "$username" >/dev/null 2>&1 || continue
@@ -37,7 +39,9 @@ for homedir in /home/*; do
   fi
 
   echo "[reinstall-brews] Reinstalling Brews for $username"
-  sudo -u "$username" bash -lc "brew reinstall \$(brew list)" || echo "[reinstall-brews] Warning: failed to restore Brews"
+
+  # Use a login shell (-l) so the user's environment is loaded.
+  su - "$username" -s /bin/bash -c '/usr/local/bin/rebrew' || echo "[reinstall-brews] Warning: failed to restore Brews for $username"
 done
 
 echo "[reinstall-brews] Reinstall complete"

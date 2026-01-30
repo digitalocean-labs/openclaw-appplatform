@@ -16,23 +16,17 @@ if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
 fi
 
 # Check if repository has any snapshots
-if ! restic snapshots --latest 1 2>/dev/null | grep -q .; then
+if ! restic snapshots latest 1 2>/dev/null | grep -q .; then
   echo "[restore-packages] No snapshots found, skipping"
   exit 0
 fi
 
 # Step 1: Restore dpkg-selections file first (from globally latest /etc snapshot, excluding current container)
-CURRENT_HOSTNAME=$TS_HOSTNAME
-ETC_SNAPSHOT=$(restic snapshots --path /etc --json 2>/dev/null | jq -r --arg host "$CURRENT_HOSTNAME" '[.[] | select(.hostname != $host)] | sort_by(.time) | reverse | .[0].id // empty')
-if [ -n "$ETC_SNAPSHOT" ]; then
-  echo "[restore-packages] Restoring package selections from snapshot $ETC_SNAPSHOT..."
-  if restic restore "$ETC_SNAPSHOT" --target / --include "$DPKG_SELECTIONS" 2>&1; then
-    echo "[restore-packages] Package selections restored"
-  else
-    echo "[restore-packages] Warning: Could not restore package selections (continuing)"
-  fi
+echo "[restore-packages] Restoring package selections from snapshot $ETC_SNAPSHOT..."
+if restic restore latest --target / --include "$DPKG_SELECTIONS" 2>&1; then
+  echo "[restore-packages] Package selections restored"
 else
-  echo "[restore-packages] No /etc snapshot found, skipping package selections restore"
+  echo "[restore-packages] Warning: Could not restore package selections (continuing)"
 fi
 
 # Step 2: Reinstall packages if selections file exists

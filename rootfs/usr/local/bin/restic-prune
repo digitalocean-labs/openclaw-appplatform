@@ -51,11 +51,10 @@ KEEP_MONTHLY=$(yq -r '.retention.keep_monthly // 6' "$CONFIG_FILE")
 log "Starting prune with retention: last=$KEEP_LAST hourly=$KEEP_HOURLY daily=$KEEP_DAILY weekly=$KEEP_WEEKLY monthly=$KEEP_MONTHLY"
 
 # Run restic forget with prune (only for this host's snapshots)
-CURRENT_HOSTNAME=$TS_HOSTNAME
-log "Pruning snapshots for host: $CURRENT_HOSTNAME"
+log "Pruning snapshots for host: $RESTIC_HOST"
 
 restic forget --prune \
-  --host "$CURRENT_HOSTNAME" \
+  --host "$RESTIC_HOST" \
   --keep-last "$KEEP_LAST" \
   --keep-hourly "$KEEP_HOURLY" \
   --keep-daily "$KEEP_DAILY" \

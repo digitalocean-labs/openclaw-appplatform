@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "/home/$USER" 2>/dev/null || cd /tmp
+
+# shellcheck disable=SC1090
+[ -f ~/.profile ]      && source ~/.profile      || true
+[ -f ~/.bash_profile ] && source ~/.bash_profile || true
+[ -f ~/.bashrc ]       && source ~/.bashrc       || true
+
+BREW=""
+if [ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
+  BREW="/home/linuxbrew/.linuxbrew/bin/brew"
+elif command -v brew >/dev/null 2>&1; then
+  BREW="$(command -v brew)"
+fi
+
+if [ -z "$BREW" ]; then
+  echo "[reinstall-brews] brew not found for user ($USER); PATH=$PATH"
+  exit 0
+fi
+
+echo "[reinstall-brews] Using brew: $BREW"
+
+"$BREW" list --formula | xargs -r "$BREW" reinstall
+"$BREW" list --cask    | xargs -r "$BREW" reinstall
