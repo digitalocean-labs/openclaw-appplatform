@@ -1,0 +1,20 @@
+#!/command/with-contenv bash
+# ngrok tunnel (enabled via ENABLE_NGROK=true)
+
+if [ "${ENABLE_NGROK:-false}" != "true" ]; then
+  echo "[ngrok] Disabled (set ENABLE_NGROK=true to enable)"
+  s6-svc -Od .
+  exit 0
+fi
+
+if [ -z "$NGROK_AUTHTOKEN" ]; then
+  echo "[ngrok] ERROR: ENABLE_NGROK=true but NGROK_AUTHTOKEN not set" >&2
+  s6-svc -Od .
+  exit 1
+fi
+
+# Configure ngrok with authtoken
+ngrok config add-authtoken "$NGROK_AUTHTOKEN"
+
+echo "[ngrok] Starting tunnel to gateway port 18789..."
+exec ngrok http 18789 --log stdout

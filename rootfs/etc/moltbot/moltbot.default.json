@@ -4,12 +4,15 @@
     "bind": "loopback",
     "controlUi": {
       "allowInsecureAuth": true
-    },
-    "tailscale": {
-      "mode": "serve"
-    },
-    "auth": {
-      "allowTailscale": true
+    }
+  },
+  "plugins": {
+    "enabled": true,
+    "entries": {
+      "whatsapp": { "enabled": true },
+      "telegram": { "enabled": true },
+      "signal": { "enabled": true },
+      "discord": { "enabled": true }
     }
   }
 }

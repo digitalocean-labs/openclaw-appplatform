@@ -1,9 +1,16 @@
 #!/command/with-contenv bash
 # Litestream SQLite replication service
 
+# Skip if ENABLE_SPACES is not true
+if [ "${ENABLE_SPACES:-false}" != "true" ]; then
+  echo "[litestream] Disabled (set ENABLE_SPACES=true for persistence)"
+  s6-svc -Od .
+  exit 0
+fi
+
 # Skip if persistence not configured
 if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
-  echo "[litestream] Persistence not configured, service disabled"
+  echo "[litestream] ENABLE_SPACES=true but LITESTREAM_ACCESS_KEY_ID or SPACES_BUCKET not set"
   s6-svc -Od .
   exit 0
 fi

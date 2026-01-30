@@ -8,9 +8,16 @@ done
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 
+# Skip if ENABLE_SPACES is not true
+if [ "${ENABLE_SPACES:-false}" != "true" ]; then
+  echo "[backup] Disabled (set ENABLE_SPACES=true for persistence)"
+  s6-svc -Od .
+  exit 0
+fi
+
 # Skip if persistence not configured
 if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
-  echo "[backup] Persistence not configured, service disabled"
+  echo "[backup] ENABLE_SPACES=true but RESTIC_REPOSITORY or RESTIC_PASSWORD not set"
   s6-svc -Od .
   exit 0
 fi

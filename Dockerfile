@@ -11,12 +11,13 @@ COPY --from=tailscale /usr/local/bin/tailscale /usr/local/bin/real_tailscale
 COPY --from=tailscale /usr/local/bin/tailscaled /usr/local/bin/tailscaled
 COPY --from=tailscale /usr/local/bin/containerboot /usr/local/bin/containerboot
 
-ARG TARGETARCH
+ARG TARGETARCH=amd64
 ARG MOLTBOT_VERSION=2026.1.27-beta.1
 ARG LITESTREAM_VERSION=0.5.6
 ARG S6_OVERLAY_VERSION=3.2.1.0
 ARG NODE_MAJOR=24
 ARG RESTIC_VERSION=0.17.3
+ARG NGROK_VERSION=3
 ARG YQ_VERSION=4.44.3
 ARG NVM_VERSION=0.40.4
 ARG MOLTBOT_STATE_DIR=/data/.moltbot
@@ -67,6 +68,12 @@ RUN set -eux; \
     bunzip2 /tmp/restic.bz2; \
     mv /tmp/restic /usr/local/bin/restic; \
     chmod +x /usr/local/bin/restic; \
+    # Install ngrok
+    curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+      | gpg --dearmor -o /etc/apt/keyrings/ngrok.gpg; \
+    echo "deb [signed-by=/etc/apt/keyrings/ngrok.gpg] https://ngrok-agent.s3.amazonaws.com buster main" \
+      > /etc/apt/sources.list.d/ngrok.list; \
+    apt-get update && apt-get install -y ngrok; \
     # Install yq for YAML parsing
     YQ_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo amd64 )"; \
     wget -q -O /usr/local/bin/yq \

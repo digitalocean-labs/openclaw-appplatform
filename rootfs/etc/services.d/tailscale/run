@@ -1,6 +1,17 @@
 #!/command/with-contenv bash
-# Tailscale daemon (required for networking)
+# Tailscale daemon (enabled via ENABLE_TAILSCALE=true)
+
+if [ "${ENABLE_TAILSCALE:-false}" != "true" ]; then
+  echo "[tailscale] Disabled (set ENABLE_TAILSCALE=true to enable)"
+  s6-svc -Od .
+  exit 0
+fi
+
+if [ -z "$TS_AUTHKEY" ]; then
+  echo "[tailscale] ERROR: ENABLE_TAILSCALE=true but TS_AUTHKEY not set" >&2
+  s6-svc -Od .
+  exit 1
+fi
 
 echo "[tailscale] Starting Tailscale daemon..."
-
 exec s6-setuidgid moltbot /usr/local/bin/containerboot

@@ -1,51 +1,108 @@
 name: moltbot
-region: tor  # Toronto (default)
-# Available regions: nyc, ams, sfo, sgp, lon, fra, blr, syd, tor
-
-# Note: This is a reference config. For Tailscale networking,
-# use .do/deploy.template.yaml which deploys as a worker.
+region: tor  # Available: nyc, ams, sfo, sgp, lon, fra, blr, syd, tor
 
 workers:
   - name: moltbot
     dockerfile_path: /Dockerfile
+    source_dir: /
     instance_count: 1
     instance_size_slug: apps-s-2vcpu-4gb
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: digitalocean-labs/clawdbot-appplatform
     envs:
-      # Required
-      - key: TS_AUTHKEY
-        scope: RUN_TIME
-        type: SECRET
+      # ============================================================
+      # REQUIRED
+      # ============================================================
       - key: SETUP_PASSWORD
         scope: RUN_TIME
         type: SECRET
       - key: MOLTBOT_STATE_DIR
+        scope: RUN_TIME
         value: /data/.moltbot
       - key: MOLTBOT_WORKSPACE_DIR
+        scope: RUN_TIME
         value: /data/workspace
-      # Tailscale configuration
+
+      # ============================================================
+      # FEATURE FLAGS
+      # Set to "true" to enable each feature, then fill in the config below
+      # ============================================================
+      - key: ENABLE_NGROK
+        scope: RUN_TIME
+        value: "false"
+      - key: ENABLE_TAILSCALE
+        scope: RUN_TIME
+        value: "false"
+      - key: ENABLE_SPACES
+        scope: RUN_TIME
+        value: "false"
+      - key: ENABLE_UI
+        scope: RUN_TIME
+        value: "true"
+
+      # ============================================================
+      # NGROK - Public Tunnel Access
+      # Set ENABLE_NGROK=true and provide your authtoken
+      # Get token: https://dashboard.ngrok.com/get-started/your-authtoken
+      # ============================================================
+      - key: NGROK_AUTHTOKEN
+        scope: RUN_TIME
+        type: SECRET
+
+      # ============================================================
+      # TAILSCALE - Private Network Access
+      # Set ENABLE_TAILSCALE=true and provide your auth key
+      # Get key: https://login.tailscale.com/admin/settings/keys
+      # NOTE: Mutually exclusive with ngrok
+      # ============================================================
+      - key: TS_AUTHKEY
+        scope: RUN_TIME
+        type: SECRET
       - key: TS_HOSTNAME
+        scope: RUN_TIME
         value: moltbot
       - key: TS_USERSPACE
+        scope: RUN_TIME
         value: "true"
       - key: TS_SOCKET
+        scope: RUN_TIME
         value: /tmp/tailscaled.sock
-      # Recommended
+
+      # ============================================================
+      # SPACES - Data Persistence
+      # Set ENABLE_SPACES=true and configure your Spaces bucket
+      # Create bucket: https://cloud.digitalocean.com/spaces
+      # ============================================================
+      - key: LITESTREAM_ACCESS_KEY_ID
+        scope: RUN_TIME
+        type: SECRET
+      - key: LITESTREAM_SECRET_ACCESS_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: SPACES_ENDPOINT
+        scope: RUN_TIME
+        value: tor1.digitaloceanspaces.com
+      - key: SPACES_BUCKET
+        scope: RUN_TIME
+        value: moltbot-backup
+      - key: RESTIC_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+
+      # ============================================================
+      # OPTIONAL
+      # ============================================================
       - key: MOLTBOT_GATEWAY_TOKEN
         scope: RUN_TIME
         type: SECRET
-      # Optional: Litestream + Spaces persistence
-      # Uncomment these to enable SQLite backup to DO Spaces
-      # - key: LITESTREAM_ACCESS_KEY_ID
-      #   scope: RUN_TIME
-      #   type: SECRET
-      # - key: LITESTREAM_SECRET_ACCESS_KEY
-      #   scope: RUN_TIME
-      #   type: SECRET
-      # - key: SPACES_ENDPOINT
-      #   value: tor1.digitaloceanspaces.com
-      # - key: SPACES_BUCKET
-      #   value: moltbot-backup
-      # Optional: Gradient AI
-      # - key: GRADIENT_API_KEY
-      #   scope: RUN_TIME
-      #   type: SECRET
+      - key: GRADIENT_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: ENABLE_SSH
+        scope: RUN_TIME
+        value: "false"
+      - key: GITHUB_USERNAME
+        scope: RUN_TIME
+        value: ""

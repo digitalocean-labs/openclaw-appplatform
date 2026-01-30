@@ -1,0 +1,7 @@
+#!/bin/bash
+# Wrapper script to run moltbot commands as the moltbot user with proper environment
+# Usage: mb <command> [args...]
+# Example: mb channels login
+#          mb gateway health --url ws://127.0.0.1:18789
+
+exec su - moltbot -c "moltbot$(printf ' %q' "$@")"

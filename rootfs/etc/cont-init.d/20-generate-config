@@ -3,6 +3,13 @@
 
 set -e
 
+# Validate mutual exclusivity of ngrok and tailscale
+if [ "${ENABLE_NGROK:-false}" = "true" ] && [ "${ENABLE_TAILSCALE:-false}" = "true" ]; then
+  echo "[generate-config] WARNING: Both ENABLE_NGROK and ENABLE_TAILSCALE are true."
+  echo "[generate-config] This doesn't make sense - ngrok is public, Tailscale is private."
+  echo "[generate-config] Defaulting to Tailscale (disable ENABLE_NGROK to silence this)."
+fi
+
 # Set HOME to moltbot's home so .profile uses correct paths
 export HOME=/home/moltbot
 
@@ -41,11 +48,15 @@ echo "[generate-config] Moltbot version: $(moltbot --version 2>/dev/null || echo
 # Generate a gateway token if not provided
 if [ -z "$MOLTBOT_GATEWAY_TOKEN" ]; then
   export MOLTBOT_GATEWAY_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -d '=/+' | head -c 32)
-  echo "[generate-config] Generated gateway token (ephemeral)"
-  # Write to s6 environment so services can access it
-  mkdir -p /run/s6/container_environment
-  echo "$MOLTBOT_GATEWAY_TOKEN" > /run/s6/container_environment/MOLTBOT_GATEWAY_TOKEN
+  echo "[generate-config] Generated gateway token (ephemeral): $MOLTBOT_GATEWAY_TOKEN"
+  echo "[generate-config] Save this token - you'll need it to connect to the Control UI"
 fi
+
+# Write token to s6 environment (both MOLTBOT_ and CLAWDBOT_ for compatibility)
+mkdir -p /run/s6/container_environment
+echo "$MOLTBOT_GATEWAY_TOKEN" > /run/s6/container_environment/MOLTBOT_GATEWAY_TOKEN
+echo "$MOLTBOT_GATEWAY_TOKEN" > /run/s6/container_environment/CLAWDBOT_GATEWAY_TOKEN
+echo "[generate-config] Gateway token configured (CLAWDBOT_GATEWAY_TOKEN)"
 
 # Start with default config as base
 if [ -f "$DEFAULT_CONFIG" ]; then
@@ -61,12 +72,75 @@ fi
 if [ -n "$GRADIENT_API_KEY" ]; then
   echo "[generate-config] Adding Gradient AI provider to config"
 
-  # Merge Gradient config into main config, injecting the API key
-  jq --argjson gradient "$CONFIG_FILE" \
-     --arg apiKey "$GRADIENT_API_KEY" \
-     '. * $gradient | .models.providers.gradient.apiKey = $apiKey' \
-     "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+  # Build Gradient provider config with full model definitions
+  GRADIENT_CONFIG=$(cat <<EOF
+{
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "gradient": {
+        "baseUrl": "https://inference.do-ai.run/v1",
+        "apiKey": "$GRADIENT_API_KEY",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "llama3.3-70b-instruct",
+            "name": "Llama 3.3 70B Instruct",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "deepseek-r1-distill-llama-70b",
+            "name": "DeepSeek R1 Distill Llama 70B",
+            "reasoning": true,
+            "input": ["text"],
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "openai-gpt-oss-120b",
+            "name": "OpenAI GPT OSS 120B",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "gradient/openai-gpt-oss-120b"
+      }
+    }
+  }
+}
+EOF
+)
+
+  # Merge Gradient config into main config
+  jq --argjson gradient "$GRADIENT_CONFIG" '. * $gradient' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 fi
+
+# Handle ENABLE_UI flag - disable Control UI if set to false
+if [ "${ENABLE_UI:-true}" = "false" ]; then
+  echo "[generate-config] Disabling Control UI (ENABLE_UI=false)"
+  jq '.gateway.controlUi.enabled = false' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+fi
+
+# Add Tailscale config when enabled
+if [ "${ENABLE_TAILSCALE:-false}" = "true" ]; then
+  echo "[generate-config] Adding Tailscale serve config"
+  jq '.gateway.tailscale.mode = "serve" | .gateway.auth.allowTailscale = true' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+fi
+
+# Add gateway auth token to config
+echo "[generate-config] Adding gateway.auth.token to config"
+jq --arg token "$MOLTBOT_GATEWAY_TOKEN" '.gateway.auth.token = $token' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 
 # Ensure moltbot owns all state files
 chown -R moltbot:moltbot "$MOLTBOT_STATE_DIR"
