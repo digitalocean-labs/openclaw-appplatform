@@ -1,0 +1,14 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Claude logs
+.claude-logs/
+
+# OS files
+.DS_Store
+
+# Temp files
+/tmp/
+*.tmp
