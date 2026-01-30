@@ -101,6 +101,7 @@ COPY rootfs/ /
 # Create non-root user (using existing home directory from rootfs)
 RUN useradd -d /home/moltbot -s /bin/bash moltbot \
     && mkdir -p "${MOLTBOT_STATE_DIR}" "${MOLTBOT_WORKSPACE_DIR}" "${TS_STATE_DIR}" \
+    && ln -s ${MOLTBOT_STATE_DIR} /home/moltbot/.clawdbot \
     && chown -R moltbot:moltbot /data \
     && chown -R moltbot:moltbot /home/moltbot
 
