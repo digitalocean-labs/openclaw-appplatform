@@ -4,7 +4,6 @@
 !.env.example
 
 # Local development
-cheatsheet.txt
 temp/
 
 # Claude Code

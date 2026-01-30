@@ -1,46 +1,275 @@
-# Moltbot App Platform Image
+# Moltbot on DigitalOcean App Platform
 
-Pre-built Docker image for deploying [Moltbot](https://github.com/moltbot/moltbot) on DigitalOcean App Platform with Tailscale networking.
+Deploy [Moltbot](https://github.com/moltbot/moltbot) - a multi-channel AI messaging gateway - on DigitalOcean App Platform in minutes.
 
 [![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/moltbot-appplatform/tree/main)
 
-## Features
+## Quick Start: Choose Your Stage
 
-- **Fast boot** (~30 seconds vs 5-10 min source build)
-- **Private networking** via Tailscale - secure access without public exposure
-- **Optional persistence** via Litestream + DO Spaces
-- **Gradient AI support** - Use DigitalOcean's serverless AI inference
-- **SSH access** - Optional SSH server for remote access
-- **Multi-arch** support (amd64/arm64)
-- **s6-overlay** - Proper process supervision with drop-in customization
+| Stage | What You Get | Cost | Access Method |
+|-------|--------------|------|---------------|
+| **1. CLI Only** | Gateway + CLI | ~$5/mo | `doctl apps console` |
+| **2. + Web UI + ngrok** | Control UI + Public URL | ~$12/mo | ngrok URL |
+| **3. + Tailscale** | Private Network | ~$25/mo | Tailscale hostname |
+| **+ Persistence** | Data survives restarts | existing subscription | DO Spaces |
 
-## Quick Start
+**Start simple, add features as needed.** Most users start with Stage 2 (ngrok) for the easiest setup.
 
-1. Click the **Deploy to DO** button above
-2. Set required environment variables (see below)
-3. Wait for deployment (~1 minute)
-4. Access via `https://moltbot.<your-tailnet>.ts.net`
+---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                     moltbot-appplatform                          │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │ s6-overlay - Process supervision and init system            ││
-│  └─────────────────────────────────────────────────────────────┘│
-│  ┌─────────────┐  ┌───────────┐  ┌──────────────────────────┐   │
-│  │ Ubuntu      │  │ Moltbot   │  │ Litestream (optional)    │   │
-│  │ Noble+Node  │  │ (latest)  │  │ SQLite → DO Spaces       │   │
-│  └─────────────┘  └───────────┘  └──────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │ Tailscale - Private networking via tailnet (required)      ││
-│  └─────────────────────────────────────────────────────────────┘│
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │ SSH Server (optional) - Remote access via ENABLE_SSH=true  ││
-│  └─────────────────────────────────────────────────────────────┘│
-└──────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                      moltbot-appplatform                           │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ s6-overlay - Process supervision and init system             │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│  ┌─────────────┐  ┌───────────────────┐  ┌────────────────────┐   │
+│  │ Ubuntu      │  │ Moltbot Gateway   │  │ Litestream         │   │
+│  │ Noble+Node  │  │ WebSocket :18789  │  │ (ENABLE_SPACES)    │   │
+│  │ + nvm       │  │ + Control UI      │  │ SQLite → DO Spaces │   │
+│  └─────────────┘  └───────────────────┘  └────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ Access Layer (choose one):                                   │  │
+│  │  • Console only (default) - doctl apps console               │  │
+│  │  • ngrok (ENABLE_NGROK) - Public tunnel to UI                │  │
+│  │  • Tailscale (ENABLE_TAILSCALE) - Private network            │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ Optional: SSH Server (ENABLE_SSH=true)                       │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+   ┌──────────┐        ┌──────────┐        ┌──────────┐
+   │ WhatsApp │        │ Telegram │        │ Discord  │
+   │ Signal   │        │ Slack    │        │ MS Teams │
+   │ iMessage │        │ Matrix   │        │ + more   │
+   └──────────┘        └──────────┘        └──────────┘
 ```
+
+---
+
+## Stage 1: CLI Only - The Basics
+
+The simplest deployment. Access via `doctl apps console` and use CLI commands.
+
+### Deploy
+
+```bash
+# Clone the repo
+git clone https://github.com/digitalocean-labs/moltbot-appplatform
+cd moltbot-appplatform
+
+# Edit app.yaml - set instance size for Stage 1
+# instance_size_slug: basic-xxs
+
+# Set your SETUP_PASSWORD in app.yaml or DO dashboard
+
+# Deploy
+doctl apps create --spec app.yaml
+```
+
+### Connect
+
+```bash
+# Get app ID
+doctl apps list
+
+# Open console
+doctl apps console <app-id> moltbot
+
+# Verify gateway is running
+mb gateway health --url ws://127.0.0.1:18789
+
+# Check channel status
+mb channels status --probe
+```
+
+### What's Included
+
+- ✅ Moltbot gateway (WebSocket on port 18789)
+- ✅ CLI access via `mb` command
+- ✅ All channel plugins (WhatsApp, Telegram, Discord, etc.)
+- ❌ No web UI access (use CLI/TUI)
+- ❌ No public URL
+- ❌ Data lost on restart
+
+---
+
+## Stage 2: Add Web UI + ngrok
+
+Add a public URL to access the Control UI. **Recommended for getting started.**
+
+### Get ngrok Token
+
+1. Sign up at https://dashboard.ngrok.com
+2. Copy your authtoken from the dashboard
+
+### Deploy
+
+Update `app.yaml`:
+
+```yaml
+instance_size_slug: basic-xs  # 1 CPU, 1GB
+
+envs:
+  - key: ENABLE_NGROK
+    value: "true"
+  - key: NGROK_AUTHTOKEN
+    type: SECRET
+    # Set value in DO dashboard
+```
+
+### Get Your URL
+
+```bash
+# In console
+curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+```
+
+Or check the ngrok dashboard at https://dashboard.ngrok.com/tunnels
+
+### What's Added
+
+- ✅ Everything from Stage 1
+- ✅ Web Control UI
+- ✅ Public URL via ngrok
+- ❌ URL changes on restart (use Tailscale for stable URL)
+- ❌ Data lost on restart
+
+---
+
+## Stage 3: Production with Tailscale
+
+Private network access via your Tailscale tailnet. **Recommended for production.**
+
+### Get Tailscale Auth Key
+
+1. Go to https://login.tailscale.com/admin/settings/keys
+2. Generate a reusable auth key
+
+### Deploy
+
+Update `app.yaml`:
+
+```yaml
+instance_size_slug: basic-s  # 1 CPU, 2GB
+
+envs:
+  - key: ENABLE_NGROK
+    value: "false"
+  - key: ENABLE_TAILSCALE
+    value: "true"
+  - key: TS_AUTHKEY
+    type: SECRET
+  - key: TS_HOSTNAME
+    value: moltbot
+```
+
+### Access
+
+```
+https://moltbot.<your-tailnet>.ts.net
+```
+
+### What's Added
+
+- ✅ Everything from Stage 1 & 2
+- ✅ Stable hostname on your tailnet
+- ✅ Private access (only your devices)
+- ✅ Production-grade security
+- ❌ Data lost on restart (add Spaces for persistence)
+
+---
+
+## Adding Persistence (Any Stage)
+
+Without persistence, all data is lost when the container restarts. Add DO Spaces to preserve:
+
+- Channel sessions (WhatsApp linking, etc.)
+- Configuration changes
+- Memory/search index
+- Tailscale state
+
+### Setup DO Spaces
+
+1. **Create a Spaces bucket** in the same region as your app
+   - Go to **Spaces Object Storage** → **Create Bucket**
+
+2. **Create access keys**
+   - Go to **API** → **Spaces Keys** → **Generate New Key**
+
+3. **Update app.yaml**:
+
+```yaml
+envs:
+  - key: ENABLE_SPACES
+    value: "true"
+  - key: LITESTREAM_ACCESS_KEY_ID
+    type: SECRET
+  - key: LITESTREAM_SECRET_ACCESS_KEY
+    type: SECRET
+  - key: SPACES_ENDPOINT
+    value: tor1.digitaloceanspaces.com  # Match your region
+  - key: SPACES_BUCKET
+    value: moltbot-backup
+  - key: RESTIC_PASSWORD
+    type: SECRET
+```
+
+### What Gets Persisted
+
+| Data | Method | Frequency |
+|------|--------|-----------|
+| SQLite (search index) | Litestream | Real-time |
+| Config, sessions | Restic | Every 5 min |
+| Tailscale state | Restic | Every 5 min |
+
+---
+
+## AI-Assisted Setup
+
+Want an AI assistant to help deploy and configure Moltbot? See **[AI-ASSISTED-SETUP.md](AI-ASSISTED-SETUP.md)** for:
+
+- Copy-paste prompts for each stage
+- WhatsApp channel setup (with QR code handling)
+- Verification steps
+- Works with Claude Code, Cursor, Codex, Gemini, etc.
+
+---
+
+## CLI Cheat Sheet
+
+The `mb` command is a wrapper that runs moltbot with the correct user and environment. **Always use `mb` in console sessions.**
+
+```bash
+# Gateway
+mb gateway health --url ws://127.0.0.1:18789
+mb gateway status
+
+# Channels
+mb channels status --probe
+mb channels login                    # WhatsApp QR code
+
+# Messages
+mb message send --channel whatsapp --target "+1234567890" --message "Hello!"
+
+# Services
+/command/s6-svc -r /run/service/moltbot    # Restart
+/command/s6-svc -r /run/service/ngrok      # Restart ngrok
+
+# Logs
+tail -f /data/.moltbot/logs/gateway.log
+
+# Config
+cat /data/.moltbot/moltbot.json | jq .
+```
+
+See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
+
+---
 
 ## Environment Variables
 
@@ -48,234 +277,110 @@ Pre-built Docker image for deploying [Moltbot](https://github.com/moltbot/moltbo
 
 | Variable | Description |
 |----------|-------------|
-| `TS_AUTHKEY` | Tailscale auth key for joining your tailnet |
-| `SETUP_PASSWORD` | Password for the web setup wizard |
+| `SETUP_PASSWORD` | Password for web setup wizard |
 
-### Recommended
+### Feature Flags
 
-| Variable | Description |
-|----------|-------------|
-| `TS_HOSTNAME` | Hostname on your tailnet (default: container hostname) |
-| `MOLTBOT_GATEWAY_TOKEN` | Admin token for gateway API access |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENABLE_NGROK` | `false` | Enable ngrok tunnel |
+| `ENABLE_TAILSCALE` | `false` | Enable Tailscale |
+| `ENABLE_SPACES` | `false` | Enable DO Spaces persistence |
+| `ENABLE_UI` | `true` | Enable web Control UI |
+| `ENABLE_SSH` | `false` | Enable SSH server |
 
-### Optional (SSH)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ENABLE_SSH` | Start SSH server on port 22 | `false` |
-
-### Optional (Gradient AI)
+### ngrok (when ENABLE_NGROK=true)
 
 | Variable | Description |
 |----------|-------------|
-| `GRADIENT_API_KEY` | DigitalOcean Gradient AI Model Access Key |
+| `NGROK_AUTHTOKEN` | Your ngrok auth token |
 
-When set, adds Gradient as a model provider with access to:
-- Llama 3.3 70B Instruct
-- Claude 4.5 Sonnet
-- Claude Opus 4.5
-- DeepSeek R1 Distill Llama 70B
+### Tailscale (when ENABLE_TAILSCALE=true)
 
-### Optional (Persistence)
+| Variable | Description |
+|----------|-------------|
+| `TS_AUTHKEY` | Tailscale auth key |
+| `TS_HOSTNAME` | Hostname on your tailnet |
 
-Without these, the app runs in ephemeral mode - state is lost on redeploy.
+### Spaces (when ENABLE_SPACES=true)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `LITESTREAM_ACCESS_KEY_ID` | DO Spaces access key | |
-| `LITESTREAM_SECRET_ACCESS_KEY` | DO Spaces secret key | |
-| `SPACES_ENDPOINT` | Spaces endpoint | `tor1.digitaloceanspaces.com` |
-| `SPACES_BUCKET` | Spaces bucket name | `my-moltbot-backup` |
+| Variable | Description |
+|----------|-------------|
+| `LITESTREAM_ACCESS_KEY_ID` | Spaces access key |
+| `LITESTREAM_SECRET_ACCESS_KEY` | Spaces secret key |
+| `SPACES_ENDPOINT` | e.g., `tor1.digitaloceanspaces.com` |
+| `SPACES_BUCKET` | Your bucket name |
+| `RESTIC_PASSWORD` | Backup encryption password |
 
-## Resource Requirements
+### Optional
 
-| Resource | Value |
-|----------|-------|
-| CPU | 1 shared vCPU |
-| RAM | 2 GB |
-| Instance | `apps-s-1vcpu-2gb` |
-| Cost | ~$25/mo (+ $5/mo Spaces optional) |
+| Variable | Description |
+|----------|-------------|
+| `MOLTBOT_GATEWAY_TOKEN` | Gateway auth token (auto-generated if not set) |
+| `GRADIENT_API_KEY` | DigitalOcean Gradient AI key |
+| `GITHUB_USERNAME` | For SSH key fetching |
 
-> **Note:** The gateway requires 2GB RAM to start reliably. Using `basic-xs` (1GB) will result in OOM errors.
+---
 
-## Available Regions
+## Customization (s6-overlay)
 
-- `nyc` - New York
-- `ams` - Amsterdam
-- `sfo` - San Francisco
-- `sgp` - Singapore
-- `lon` - London
-- `fra` - Frankfurt
-- `blr` - Bangalore
-- `syd` - Sydney
-- `tor` - Toronto (default)
+The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) for process supervision.
 
-Edit the `region` field in `app.yaml` to change.
+### Add Custom Init Scripts
 
-## Manual Deployment
-
-```bash
-# Clone and deploy
-git clone https://github.com/digitalocean-labs/moltbot-appplatform
-cd moltbot-appplatform
-
-# Validate spec
-doctl apps spec validate app.yaml
-
-# Create app
-doctl apps create --spec app.yaml
-
-# Set secrets in the DO dashboard
-```
-
-## Customizing the Image
-
-The `rootfs/` directory allows you to add or override any files in the container. Files are copied to `/` at the end of the Docker build.
-
-This image uses [s6-overlay](https://github.com/just-containers/s6-overlay) for process supervision, which provides two ways to add custom logic:
-
-### Directory Structure
-
-```
-rootfs/
-├── etc/
-│   ├── cont-init.d/               # One-time initialization scripts
-│   │   └── 30-my-setup            # Runs once at startup
-│   ├── services.d/                # Long-running services (supervised)
-│   │   └── my-daemon/
-│   │       └── run                # Daemon start script
-│   ├── ssh/
-│   │   └── sshd_config.d/
-│   │       └── 10-custom.conf     → /etc/ssh/sshd_config.d/10-custom.conf
-│   └── motd                        → /etc/motd
-└── home/
-    └── moltbot/
-        └── .bashrc                 → /home/moltbot/.bashrc
-```
-
-### Initialization Scripts (`cont-init.d`)
-
-One-time scripts that run at container startup before services start. Scripts run in alphanumeric order.
-
-**Example:** `rootfs/etc/cont-init.d/30-install-tools`
+Create `rootfs/etc/cont-init.d/30-my-script`:
 
 ```bash
 #!/command/with-contenv bash
-# Install additional tools
-apt-get update && apt-get install -y vim htop
+echo "Running my custom setup..."
 ```
 
-**Notes:**
-- Use `#!/command/with-contenv bash` to inherit environment variables
-- Scripts run as root
-- Built-in scripts use `00-` through `20-` prefixes; use `30-` or higher for custom scripts
+### Add Custom Services
 
-### Custom Services (`services.d`)
-
-Long-running daemons that s6 supervises and restarts if they crash.
-
-**Example:** `rootfs/etc/services.d/my-daemon/run`
+Create `rootfs/etc/services.d/my-daemon/run`:
 
 ```bash
 #!/command/with-contenv bash
 exec my-daemon --foreground
 ```
 
-**Notes:**
-- The `run` script must `exec` the daemon (not fork to background)
-- s6 automatically restarts the service if it exits
-- Add a `finish` script for cleanup on shutdown
-- Add a `down` file to disable the service by default
-
 ### Built-in Services
 
 | Service | Description |
 |---------|-------------|
-| `tailscale` | Tailscale daemon (required) |
 | `moltbot` | Moltbot gateway |
-| `sshd` | SSH server (if `ENABLE_SSH=true`) |
-| `crond` | Cron daemon for scheduled backups |
-| `litestream` | SQLite replication (if persistence configured) |
+| `ngrok` | ngrok tunnel (if enabled) |
+| `tailscale` | Tailscale daemon (if enabled) |
+| `litestream` | SQLite replication (if enabled) |
+| `backup` | Restic backup (if enabled) |
+| `sshd` | SSH server (if enabled) |
 
-### Built-in Init Scripts
+---
 
-| Script | Description |
-|--------|-------------|
-| `05-setup-restic` | Configures restic for DO Spaces backup |
-| `06-restore-packages` | Restores user-installed packages from backup |
-| `10-restore-state` | Restores state paths from restic backup |
-| `15-restore-sqlite` | Restores SQLite via Litestream |
-| `20-generate-config` | Generates moltbot.json from environment |
+## Available Regions
 
-### General Notes
+| Code | Location |
+|------|----------|
+| `nyc` | New York |
+| `ams` | Amsterdam |
+| `sfo` | San Francisco |
+| `sgp` | Singapore |
+| `lon` | London |
+| `fra` | Frankfurt |
+| `blr` | Bangalore |
+| `syd` | Sydney |
+| `tor` | Toronto (default) |
 
-- Files are copied with `COPY rootfs/ /` which preserves directory structure
-- Existing files in the container will be overwritten
-- File permissions from the source are preserved
-
-## Setting Up Persistence
-
-App Platform doesn't have persistent volumes, so this image uses DO Spaces for state backup.
-
-### What Gets Persisted
-
-| Data Type | Backup Method | Description |
-|-----------|--------------|-------------|
-| Memory search index | Litestream (real-time) | SQLite database for vector search |
-| Config, devices, sessions | Restic (every 5 min) | JSON state files |
-| Tailscale state | Restic (every 5 min) | Auth keys and node identity |
-| User-installed packages | Restic (every 5 min) | dpkg selections for apt packages |
-
-### Setup Steps
-
-1. **Create a Spaces bucket** in the same region as your app
-   - Go to **Spaces Object Storage** → **Create Bucket**
-   - Name: e.g., `moltbot-backup`
-   - Region: match your app (e.g., `tor1` for Toronto)
-
-2. **Create Spaces access keys**
-   - Go to **Settings → API → Spaces Keys**
-   - Click **Generate New Key**
-   - Save both Access Key and Secret Key
-
-3. **Add environment variables** to your App Platform app:
-   - `LITESTREAM_ACCESS_KEY_ID` = your access key
-   - `LITESTREAM_SECRET_ACCESS_KEY` = your secret key
-   - `SPACES_ENDPOINT` = `<region>.digitaloceanspaces.com` (e.g., `tor1.digitaloceanspaces.com`)
-   - `SPACES_BUCKET` = your bucket name
-
-4. **Redeploy** the app
-
-### How It Works
-
-On startup:
-1. Sets hostname from `TS_HOSTNAME` (if provided)
-2. Configures restic for DO Spaces
-3. Restores and reinstalls user-installed packages (if backed up)
-4. Restores state paths via restic (config, tailscale, etc.)
-5. Restores SQLite via Litestream (if exists)
-6. Generates gateway config and starts services
-
-During operation:
-- Litestream continuously replicates SQLite changes (1s sync interval)
-- Cron runs restic backup every 5 minutes
-- Cron runs restic prune daily at 3am (per-host retention)
-- On graceful shutdown (SIGTERM), final state backup is saved
-
-## Tailscale Setup
-
-Tailscale is required for networking. To set up:
-
-1. Create a Tailscale auth key at https://login.tailscale.com/admin/settings/keys
-2. Set `TS_AUTHKEY` environment variable
-3. Optionally set `TS_HOSTNAME` for a custom hostname
-4. Deploy as a **worker** (use `.do/deploy.template.yaml`)
-5. Access via `https://moltbot.<your-tailnet>.ts.net`
+---
 
 ## Documentation
 
-- [Full deployment guide](https://docs.molt.bot/digitalocean)
-- [Moltbot documentation](https://docs.molt.bot)
+- [Moltbot Documentation](https://docs.molt.bot)
+- [DigitalOcean App Platform](https://docs.digitalocean.com/products/app-platform/)
+- [AI-Assisted Setup Guide](AI-ASSISTED-SETUP.md)
+- [CLI Cheat Sheet](CHEATSHEET.md)
+
+---
 
 ## License
 

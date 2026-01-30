@@ -18,12 +18,6 @@ workers:
       - key: SETUP_PASSWORD
         scope: RUN_TIME
         type: SECRET
-      - key: MOLTBOT_STATE_DIR
-        scope: RUN_TIME
-        value: /data/.moltbot
-      - key: MOLTBOT_WORKSPACE_DIR
-        scope: RUN_TIME
-        value: /data/workspace
 
       # ============================================================
       # FEATURE FLAGS
