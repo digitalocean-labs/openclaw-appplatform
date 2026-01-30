@@ -135,12 +135,12 @@ fi
 # Add Tailscale config when enabled
 if [ "${ENABLE_TAILSCALE:-false}" = "true" ]; then
   echo "[generate-config] Adding Tailscale serve config"
-  jq '.gateway.tailscale.mode = "serve" | .gateway.auth.allowTailscale = true' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+  jq '.gateway.tailscale.resetOnExit = true | .gateway.tailscale.mode = "serve" | .gateway.auth.allowTailscale = true' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 fi
 
 # Add gateway auth token to config
 echo "[generate-config] Adding gateway.auth.token to config"
-jq --arg token "$MOLTBOT_GATEWAY_TOKEN" '.gateway.auth.token = $token' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+jq --arg token "$MOLTBOT_GATEWAY_TOKEN" '.gateway.auth.token = $token | gateway.auth.mode = "token"' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 
 # Ensure moltbot owns all state files
 chown -R moltbot:moltbot "$MOLTBOT_STATE_DIR"
