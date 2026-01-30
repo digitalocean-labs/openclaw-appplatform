@@ -33,6 +33,8 @@ if [ -z "$RESTIC_PASSWORD" ]; then
 fi
 echo "$RESTIC_PASSWORD" > /run/s6/container_environment/RESTIC_PASSWORD
 
+echo "$TS_HOSTNAME" > /run/s6/container_environment/RESTIC_HOST
+
 # Build repository URL from config (expand env vars)
 REPO_TEMPLATE=$(yq -r '.repository' "$CONFIG_FILE")
 RESTIC_REPOSITORY=$(eval echo "$REPO_TEMPLATE")
