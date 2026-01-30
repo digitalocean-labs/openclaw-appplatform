@@ -37,6 +37,8 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends \
       ca-certificates \
       wget \
+      unzip \
+      vim \
       curl \
       git \
       gh \
@@ -120,6 +122,8 @@ RUN export SHELL=/bin/bash  && export NVM_DIR="$HOME/.nvm" \
     && export PATH="$PNPM_HOME:$PATH" \
     && pnpm add -g "moltbot@${MOLTBOT_VERSION}"
 
+RUN echo "export MOLTBOT_STATE_DIR=${MOLTBOT_STATE_DIR}" >> /home/moltbot/.bashrc
+RUN echo "export MOLTBOT_WORKSPACE_DIR=${MOLTBOT_WORKSPACE_DIR}" >> /home/moltbot/.bashrc
 # Switch back to root for final setup
 USER root
 
