@@ -2,14 +2,14 @@
 
 Deploy [Moltbot](https://github.com/moltbot/moltbot) - a multi-channel AI messaging gateway - on DigitalOcean App Platform in minutes.
 
-[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/moltbot-appplatform/tree/main)
+[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/clawdbot-appplatform/tree/main)
 
 ## Quick Start: Choose Your Stage
 
 | Stage | What You Get | Cost | Access Method |
 |-------|--------------|------|---------------|
-| **1. CLI Only** | Gateway + CLI | ~$12/mo | `doctl apps console` |
-| **2. + Web UI + ngrok** | Control UI + Public URL | ~$12/mo | ngrok URL |
+| **1. CLI Only** | Gateway + CLI | ~$10/mo | `doctl apps console` |
+| **2. + Web UI + ngrok** | Control UI + Public URL | ~$10/mo | ngrok URL |
 | **3. + Tailscale** | Private Network | ~$25/mo | Tailscale hostname |
 | **+ Persistence** | Data survives restarts | existing subscription | DO Spaces |
 
@@ -63,7 +63,7 @@ git clone https://github.com/digitalocean-labs/moltbot-appplatform
 cd moltbot-appplatform
 
 # Edit app.yaml - set instance size for Stage 1
-# instance_size_slug: basic-xs  # 1 CPU, 1GB (minimum for stable operation)
+# instance_size_slug: apps-s-1vcpu-1gb-fixed  # 1 CPU, 1GB (minimum for stable operation)
 
 # Set your SETUP_PASSWORD in app.yaml or DO dashboard
 
@@ -112,7 +112,7 @@ Add a public URL to access the Control UI. **Recommended for getting started.**
 Update `app.yaml`:
 
 ```yaml
-instance_size_slug: basic-xs  # 1 CPU, 1GB
+instance_size_slug: apps-s-1vcpu-1gb-fixed  # 1 CPU, 1GB
 
 envs:
   - key: ENABLE_NGROK
@@ -155,7 +155,7 @@ Private network access via your Tailscale tailnet. **Recommended for production.
 Update `app.yaml`:
 
 ```yaml
-instance_size_slug: basic-s  # 1 CPU, 2GB
+instance_size_slug: apps-s-1vcpu-2gb  # 1 CPU, 2GB
 
 envs:
   - key: ENABLE_NGROK

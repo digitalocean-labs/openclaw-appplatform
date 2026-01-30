@@ -6,11 +6,16 @@ spec:
       dockerfile_path: /Dockerfile
       source_dir: /
       instance_count: 1
-      instance_size_slug: apps-s-2vcpu-4gb
+      instance_size_slug: apps-s-1vcpu-0.5gb
       git:
         branch: main
-        repo_clone_url: https://github.com/digitalocean-labs/moltbot-appplatform.git
+        repo_clone_url: https://github.com/digitalocean-labs/clawdbot-appplatform.git
       envs:
+        # Provide your Gradient inference key
+        - key: GRADIENT_API_KEY
+          scope: RUN_TIME
+          type: SECRET
+
         # Required
         - key: SETUP_PASSWORD
           scope: RUN_TIME
@@ -28,7 +33,7 @@ spec:
           value: "false"
         - key: ENABLE_UI
           scope: RUN_TIME
-          value: "true"
+          value: "false"
 
         # ngrok config
         - key: NGROK_AUTHTOKEN
@@ -68,9 +73,6 @@ spec:
 
         # Optional
         - key: MOLTBOT_GATEWAY_TOKEN
-          scope: RUN_TIME
-          type: SECRET
-        - key: GRADIENT_API_KEY
           scope: RUN_TIME
           type: SECRET
         - key: ENABLE_SSH
