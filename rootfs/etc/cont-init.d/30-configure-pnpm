@@ -1,5 +1,0 @@
-#!/command/with-contenv bash
-# Configure pnpm
-
-echo "[pnpm-configure] Configuring pnpm"
-su - moltbot -c "pnpm setup" || echo "[pnpm-configure] Warning: failed to configure pnpm"

@@ -101,16 +101,16 @@ RUN mkdir -p /home/moltbot/.local/share/pnpm && chown -R moltbot:moltbot /home/m
 USER moltbot
 
 # Install nvm, Node.js LTS, pnpm, and moltbot
-# NVM_DIR and PNPM_HOME are set in /home/moltbot/.profile for runtime
-RUN export NVM_DIR="$HOME/.nvm" \
-    && export PNPM_HOME="$HOME/.local/share/pnpm" \
-    && export PATH="$PNPM_HOME:$PATH" \
+RUN export SHELL=/bin/bash  && export NVM_DIR="$HOME/.nvm" \
     && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash \
     && . "$NVM_DIR/nvm.sh" \
     && nvm install --lts \
     && nvm use --lts \
     && nvm alias default lts/* \
     && npm install -g pnpm \
+    && pnpm setup \
+    && export PNPM_HOME="/home/moltbot/.local/share/pnpm" \
+    && export PATH="$PNPM_HOME:$PATH" \
     && pnpm add -g "moltbot@${MOLTBOT_VERSION}"
 
 # Switch back to root for final overlay
