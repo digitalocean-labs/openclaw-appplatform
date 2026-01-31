@@ -74,13 +74,12 @@ for i in $(seq 0 $((PATH_COUNT - 1))); do
 done
 
 # Fix ownership on moltbot directories (restored as root, needs moltbot user)
-if [ -d "$MOLTBOT_STATE_DIR" ]; then
+if [ -n "$MOLTBOT_STATE_DIR" ] && [ -d "$MOLTBOT_STATE_DIR" ]; then
   chown -R moltbot:moltbot "$MOLTBOT_STATE_DIR"
 fi
 
-# Fix ownership on tailscale directory (restored as root/tailscale, needs moltbot user)
-# The Tailscale service runs as moltbot user, so it needs write access
-if [ -d "$TS_STATE_DIR" ]; then
+# Fix ownership on tailscale directory
+if [ -n "$TS_STATE_DIR" ] && [ -d "$TS_STATE_DIR" ]; then
   chown -R moltbot:moltbot "$TS_STATE_DIR"
   chmod 750 "$TS_STATE_DIR"
 fi
