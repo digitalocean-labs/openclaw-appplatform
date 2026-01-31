@@ -1,3 +1,3 @@
-#!/command/execlineb -P
+#!/command/with-contenv bash
 # Start cron daemon in foreground
-/usr/sbin/cron -f >  /proc/1/fd/1
+exec /usr/sbin/cron -f > /proc/1/fd/1 2>&1
