@@ -1,6 +1,0 @@
-# Restic scheduled tasks
-# Note: Tasks check for persistence config and skip if not configured
-
-
-# Prune daily at 3am
-0 3 * * * root /usr/local/bin/restic-prune --quiet

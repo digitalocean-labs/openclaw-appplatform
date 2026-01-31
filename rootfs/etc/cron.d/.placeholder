@@ -1,0 +1,7 @@
+# Restic scheduled tasks
+# Note: Tasks check for persistence config and skip if not configured
+
+
+# Forward to supervise process so we can capture logs.
+# * * * * * root echo "HEY" > /proc/1/fd/1
+ 
