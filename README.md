@@ -25,11 +25,11 @@ Deploy [Moltbot](https://github.com/moltbot/moltbot) - a multi-channel AI messag
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │ s6-overlay - Process supervision and init system             │  │
 │  └──────────────────────────────────────────────────────────────┘  │
-│  ┌─────────────┐  ┌───────────────────┐  ┌────────────────────┐   │
-│  │ Ubuntu      │  │ Moltbot Gateway   │  │ Litestream         │   │
-│  │ Noble+Node  │  │ WebSocket :18789  │  │ (ENABLE_SPACES)    │   │
-│  │ + nvm       │  │ + Control UI      │  │ SQLite → DO Spaces │   │
-│  └─────────────┘  └───────────────────┘  └────────────────────┘   │
+│  ┌─────────────┐  ┌───────────────────┐                            │
+│  │ Ubuntu      │  │ Moltbot Gateway   │                            │
+│  │ Noble+Node  │  │ WebSocket :18789  │                            │
+│  │ + nvm       │  │ + Control UI      │                            │
+│  └─────────────┘  └───────────────────┘                            │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │ Access Layer (choose one):                                   │  │
 │  │  • Console only (default) - doctl apps console               │  │
@@ -104,7 +104,7 @@ Add a public URL to access the Control UI. **Recommended for getting started.**
 
 ### Get ngrok Token
 
-1. Sign up at https://dashboard.ngrok.com
+1. Sign up at <https://dashboard.ngrok.com>
 2. Copy your authtoken from the dashboard
 
 ### Deploy
@@ -129,7 +129,7 @@ envs:
 curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
 ```
 
-Or check the ngrok dashboard at https://dashboard.ngrok.com/tunnels
+Or check the ngrok dashboard at <https://dashboard.ngrok.com/tunnels>
 
 ### What's Added
 
@@ -147,7 +147,7 @@ Private network access via your Tailscale tailnet. **Recommended for production.
 
 ### Get Tailscale Auth Key
 
-1. Go to https://login.tailscale.com/admin/settings/keys
+1. Go to <https://login.tailscale.com/admin/settings/keys>
 2. Generate a reusable auth key
 
 ### Deploy
@@ -207,13 +207,13 @@ Without persistence, all data is lost when the container restarts. Add DO Spaces
 envs:
   - key: ENABLE_SPACES
     value: "true"
-  - key: AWS_ACCESS_KEY_ID
+  - key: RESTIC_SPACES_ACCESS_KEY_ID
     type: SECRET
-  - key: AWS_ACCESS_KEY_ID
+  - key: RESTIC_SPACES_ACCESS_KEY_ID
     type: SECRET
-  - key: SPACES_ENDPOINT
+  - key: RESTIC_SPACES_ENDPOINT
     value: tor1.digitaloceanspaces.com  # Match your region
-  - key: SPACES_BUCKET
+  - key: RESTIC_SPACES_BUCKET
     value: moltbot-backup
   - key: RESTIC_PASSWORD
     type: SECRET
@@ -223,9 +223,9 @@ envs:
 
 | Data | Method | Frequency |
 |------|--------|-----------|
-| SQLite (search index) | Litestream | Real-time |
-| Config, sessions | Restic | Every 5 min |
-| Tailscale state | Restic | Every 5 min |
+| Config, sessions | Restic | Every 30 seconds |
+| Tailscale state | Restic | Every 30 seconds |
+| apt and Homebrew packages | Restic |Every 30 seconds|
 
 ---
 
@@ -306,10 +306,10 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 
 | Variable | Description |
 |----------|-------------|
-| `AWS_ACCESS_KEY_ID` | Spaces access key |
-| `AWS_ACCESS_KEY_ID` | Spaces secret key |
-| `SPACES_ENDPOINT` | e.g., `tor1.digitaloceanspaces.com` |
-| `SPACES_BUCKET` | Your bucket name |
+| `RESTIC_SPACES_ACCESS_KEY_ID` | Spaces access key |
+| `RESTIC_SPACES_ACCESS_KEY_ID` | Spaces secret key |
+| `RESTIC_SPACES_ENDPOINT` | e.g., `tor1.digitaloceanspaces.com` |
+| `RESTIC_SPACES_BUCKET` | Your bucket name |
 | `RESTIC_PASSWORD` | Backup encryption password |
 
 ### Optional
@@ -351,7 +351,6 @@ exec my-daemon --foreground
 | `moltbot` | Moltbot gateway |
 | `ngrok` | ngrok tunnel (if enabled) |
 | `tailscale` | Tailscale daemon (if enabled) |
-| `litestream` | SQLite replication (if enabled) |
 | `backup` | Restic backup (if enabled) |
 | `sshd` | SSH server (if enabled) |
 

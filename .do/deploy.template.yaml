@@ -49,16 +49,16 @@ spec:
           type: SECRET
 
         # Spaces config
-        - key: AWS_ACCESS_KEY_ID
+        - key: RESTIC_SPACES_ACCESS_KEY_ID
           scope: RUN_TIME
           type: SECRET
-        - key: AWS_SECRET_ACCESS_KEY
+        - key: RESTIC_SPACES_SECRET_ACCESS_KEY
           scope: RUN_TIME
           type: SECRET
-        - key: SPACES_ENDPOINT
+        - key: RESTIC_SPACES_ENDPOINT
           scope: RUN_TIME
           value: tor1.digitaloceanspaces.com
-        - key: SPACES_BUCKET
+        - key: RESTIC_SPACES_BUCKET
           scope: RUN_TIME
           value: moltbot-backup
         - key: RESTIC_PASSWORD

@@ -9,7 +9,6 @@ This repository contains the Docker configuration and deployment templates for r
 - `Dockerfile` - Builds image with Ubuntu Noble, s6-overlay, Tailscale, Homebrew, pnpm, and moltbot
 - `app.yaml` - App Platform service configuration (for reference, uses worker for Tailscale)
 - `.do/deploy.template.yaml` - App Platform worker configuration (recommended)
-- `litestream.yml` - SQLite replication config for persistence via DO Spaces
 - `moltbot.default.json` - Base gateway configuration
 - `tailscale` - Wrapper script to inject socket path for tailscale CLI
 - `rootfs/` - Overlay directory for custom files and s6 services
@@ -24,7 +23,7 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 
 **Services** (`rootfs/etc/services.d/`):
 - `tailscale/` - Tailscale daemon (required)
-- `moltbot/` - Moltbot gateway with Litestream
+- `moltbot/` - Moltbot gateway
 - `sshd/` - SSH server (if ENABLE_SSH=true)
 - `backup/` - Periodic state backup (if persistence configured)
 
@@ -53,8 +52,7 @@ Set `GRADIENT_API_KEY` to enable DigitalOcean's serverless AI inference with mod
 
 ## Persistence
 
-Optional DO Spaces backup via Litestream + s3cmd:
-- SQLite: real-time replication via Litestream
+Optional DO Spaces backup:
 - JSON state: periodic backup every 5 minutes
 - Tailscale state: periodic backup every 5 minutes
 

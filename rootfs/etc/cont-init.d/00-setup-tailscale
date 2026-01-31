@@ -27,33 +27,38 @@ while IFS='=' read -r var value; do
   }
 done < <(env | grep -E '^TS_')
 
-# Set ownership of TS_ environment files to moltbot (the user that runs the service)
-chown moltbot:moltbot /run/s6/container_environment/TS_* 2>/dev/null || {
+# Set ownership of TS_ environment files to tailscale (the user that runs the service)
+chown root:root /run/s6/container_environment/TS_* 2>/dev/null || {
   echo "[tailscale] Warning: Failed to set ownership of TS_ environment files" >&2
+    exit 1
 }
 
 # Secure TS_ environment files with restrictive permissions
-# Set all TS_* files to 640 (owner/group read/write, no world access)
-chmod 640 /run/s6/container_environment/TS_* 2>/dev/null || {
+# Set all TS_* files to 400 (owner read only)
+chmod 400 /run/s6/container_environment/TS_* 2>/dev/null || {
   echo "[tailscale] Warning: Failed to secure TS_ environment files" >&2
+    exit 1
 }
 
-# TS_AUTHKEY is especially sensitive - override to owner read/write only (600)
-chmod 600 /run/s6/container_environment/TS_AUTHKEY 2>/dev/null || {
-  echo "[tailscale] Warning: Failed to secure TS_AUTHKEY" >&2
-}
-
-# Create state directory and set ownership to moltbot (idempotent)
-# The Tailscale service runs as moltbot user, so it needs write access
+# Create state directory and set ownership to tailscale (idempotent)
 mkdir -p "$TS_STATE_DIR"
-chown -R moltbot:moltbot "$TS_STATE_DIR" || {
+chown -R root:root "$TS_STATE_DIR" || {
   echo "[tailscale] Warning: Failed to set ownership of $TS_STATE_DIR" >&2
   exit 1
 }
 
-# Secure state directory permissions (750: owner/group read/write/execute, no world access)
-chmod 750 "$TS_STATE_DIR" || {
+# Secure state directory permissions (700: owner read/write)
+# The Tailscale service runs as tailscale user, so it needs write access
+chmod 0700 "$TS_STATE_DIR" || {
   echo "[tailscale] Warning: Failed to secure $TS_STATE_DIR" >&2
+    exit 1
 }
+
+# Set umask to 0077 for the state directory so that the files are created with the correct permissions
+umask 0077 "$TS_STATE_DIR" || {
+  echo "[tailscale] Warning: Failed to set umask for $TS_STATE_DIR" >&2
+    exit 1
+}
+
 
 echo "[tailscale] Setup complete"

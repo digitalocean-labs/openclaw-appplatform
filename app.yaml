@@ -64,16 +64,16 @@ workers:
       # Set ENABLE_SPACES=true and configure your Spaces bucket
       # Create bucket: https://cloud.digitalocean.com/spaces
       # ============================================================
-      - key: AWS_ACCESS_KEY_ID
+      - key: RESTIC_SPACES_ACCESS_KEY_ID
         scope: RUN_TIME
         type: SECRET
-      - key: AWS_ACCESS_KEY_ID
+      - key: RESTIC_SPACES_ACCESS_KEY_ID
         scope: RUN_TIME
         type: SECRET
-      - key: SPACES_ENDPOINT
+      - key: RESTIC_SPACES_ENDPOINT
         scope: RUN_TIME
         value: tor1.digitaloceanspaces.com
-      - key: SPACES_BUCKET
+      - key: RESTIC_SPACES_BUCKET
         scope: RUN_TIME
         value: moltbot-backup
       - key: RESTIC_PASSWORD

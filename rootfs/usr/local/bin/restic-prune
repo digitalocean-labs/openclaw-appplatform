@@ -5,7 +5,7 @@
 set -e
 
 # Source s6 container environment (required for cron which doesn't inherit env)
-for f in /run/s6/container_environment/*; do
+for f in /run/s6/container_environment/RESTIC_*; do
   [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
 done
 
@@ -36,11 +36,11 @@ if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
 fi
 
 # Ensure AWS credentials are exported for restic S3 backend
-if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-  log "ERROR: AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY not set"
+if [ -z "$RESTIC_SPACES_ACCESS_KEY_ID" ] || [ -z "$RESTIC_SPACES_SECRET_ACCESS_KEY" ]; then
+  log "ERROR: RESTIC_SPACES_ACCESS_KEY_ID or RESTIC_SPACES_SECRET_ACCESS_KEY not set"
   exit 1
 fi
-export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY RESTIC_REPOSITORY RESTIC_PASSWORD
+export AWS_ACCESS_KEY_ID="$RESTIC_SPACES_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$RESTIC_SPACES_SECRET_ACCESS_KEY"
 
 # Check if config exists
 if [ ! -f "$CONFIG_FILE" ]; then

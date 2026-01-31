@@ -3,12 +3,16 @@
 
 # Restic repository location (S3-compatible)
 # Environment variables are expanded at runtime
-repository: "s3:${SPACES_ENDPOINT}/${SPACES_BUCKET}/${STABLE_HOSTNAME}/restic"
+repository: "s3:${RESTIC_SPACES_ENDPOINT}/${RESTIC_SPACES_BUCKET}/${RESTIC_HOST}/restic"
 # Backup paths with per-path exclusions
 # Order matters for restore: /etc is restored first after packages
 paths:
   - path: /etc
   - path: /root
+    exclude:
+      - "*.lock"
+      - "*.pid"
+      - "*.sock"
   - path: /data/.moltbot
     exclude:
       - "*.lock"

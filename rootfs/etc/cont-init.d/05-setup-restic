@@ -4,29 +4,15 @@
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 
 # Skip if persistence not configured
-if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
+if [ -z "$RESTIC_SPACES_ACCESS_KEY_ID" ] || [ -z "$RESTIC_SPACES_BUCKET" ]; then
   echo "[setup-restic] Persistence not configured, skipping"
   exit 0
 fi
 
 echo "[setup-restic] Configuring restic for DO Spaces..."
 
-# Create s6 container environment directory
-mkdir -p /run/s6/container_environment
+export RESTIC_HOST=${STABLE_HOSTNAME:-moltbot}
 
-# Export AWS credentials for restic S3 backend
-echo "$AWS_ACCESS_KEY_ID" > /run/s6/container_environment/AWS_ACCESS_KEY_ID
-echo "$AWS_SECRET_ACCESS_KEY" > /run/s6/container_environment/AWS_SECRET_ACCESS_KEY
-
-# Export Spaces configuration (needed for repository path expansion in backup.yaml)
-echo "${SPACES_ENDPOINT:-}" > /run/s6/container_environment/SPACES_ENDPOINT
-echo "${SPACES_BUCKET:-}" > /run/s6/container_environment/SPACES_BUCKET
-
-# Export STABLE_HOSTNAME (needed for repository path expansion in backup.yaml)
-# Default to 'moltbot' if not set
-STABLE_HOSTNAME="${STABLE_HOSTNAME:-moltbot}"
-echo "$STABLE_HOSTNAME" > /run/s6/container_environment/STABLE_HOSTNAME
-export STABLE_HOSTNAME
 
 # Set restic password (from env or generate a persistent one)
 if [ -z "$RESTIC_PASSWORD" ]; then
@@ -41,20 +27,13 @@ if [ -z "$RESTIC_PASSWORD" ]; then
     echo "[setup-restic] Generated new restic password (stored in $MOLTBOT_STATE_DIR/.restic-password)"
   fi
 fi
-echo "$RESTIC_PASSWORD" > /run/s6/container_environment/RESTIC_PASSWORD
-
-echo "$STABLE_HOSTNAME" > /run/s6/container_environment/RESTIC_HOST
-
-# Build repository URL from config (expand env vars)
-# Ensure SPACES_ENDPOINT and SPACES_BUCKET are exported for eval
-export SPACES_ENDPOINT SPACES_BUCKET
 
 # Validate required variables are set
-if [ -z "$SPACES_ENDPOINT" ] || [ -z "$SPACES_BUCKET" ] || [ -z "$STABLE_HOSTNAME" ]; then
-  echo "[setup-restic] ERROR: SPACES_ENDPOINT, SPACES_BUCKET, or STABLE_HOSTNAME not set" >&2
-  echo "[setup-restic] SPACES_ENDPOINT=${SPACES_ENDPOINT:-unset}" >&2
-  echo "[setup-restic] SPACES_BUCKET=${SPACES_BUCKET:-unset}" >&2
-  echo "[setup-restic] STABLE_HOSTNAME=${STABLE_HOSTNAME:-unset}" >&2
+if [ -z "$RESTIC_SPACES_ENDPOINT" ] || [ -z "$RESTIC_SPACES_BUCKET" ] || [ -z "$RESTIC_HOST" ]; then
+  echo "[setup-restic] ERROR: RESTIC_SPACES_ENDPOINT, RESTIC_SPACES_BUCKET, or RESTIC_HOST not set" >&2
+  echo "[setup-restic] RESTIC_SPACES_ENDPOINT=${RESTIC_SPACES_ENDPOINT:-unset}" >&2
+  echo "[setup-restic] RESTIC_SPACES_BUCKET=${RESTIC_SPACES_BUCKET:-unset}" >&2
+  echo "[setup-restic] RESTIC_HOST=${RESTIC_HOST:-unset}" >&2
   exit 1
 fi
 
@@ -68,13 +47,28 @@ if echo "$RESTIC_REPOSITORY" | grep -q '\${'; then
   exit 1
 fi
 
-echo "$RESTIC_REPOSITORY" > /run/s6/container_environment/RESTIC_REPOSITORY
 
 # Export for current script
-export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
-export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
 export RESTIC_PASSWORD
 export RESTIC_REPOSITORY
+
+# Ensure Spaces credentials are exported for restic S3 backend
+if [ -z "$RESTIC_SPACES_ACCESS_KEY_ID" ] || [ -z "$RESTIC_SPACES_SECRET_ACCESS_KEY" ]; then
+  log "ERROR: RESTIC_SPACES_ACCESS_KEY_ID or RESTIC_SPACES_SECRET_ACCESS_KEY not set"
+  exit 1
+fi
+export AWS_ACCESS_KEY_ID="$RESTIC_SPACES_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$RESTIC_SPACES_SECRET_ACCESS_KEY"
+
+
+# Write all RESTIC_ prefixed environment variables
+# Ensure environment directory exists
+mkdir -p /run/s6/container_environment
+
+while IFS='=' read -r var value; do
+  echo "$value" > "/run/s6/container_environment/$var" || {
+  echo "[tailscale] Warning: Failed to write $var" >&2
+}
+done < <(env | grep -E '^RESTIC_')
 
 # Initialize restic repo if it doesn't exist
 echo "[setup-restic] Checking if restic repository exists..."

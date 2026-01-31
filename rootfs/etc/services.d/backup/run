@@ -2,7 +2,7 @@
 # Periodic backup service using restic
 
 # Source s6 container environment (ensures vars are available)
-for f in /run/s6/container_environment/*; do
+for f in /run/s6/container_environment/RESTIC_*; do
   [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
 done
 

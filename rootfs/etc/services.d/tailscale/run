@@ -8,7 +8,7 @@ if [ "${ENABLE_TAILSCALE:-false}" != "true" ]; then
 fi
 
 # Source s6 container environment (ensures vars are available)
-for f in /run/s6/container_environment/*; do
+for f in /run/s6/container_environment/TS_*; do
   [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
 done
 
@@ -19,4 +19,4 @@ if [ -z "$TS_AUTHKEY" ]; then
 fi
 
 echo "[tailscale] Starting Tailscale daemon..."
-exec s6-setuidgid moltbot /usr/local/bin/containerboot
+exec /usr/local/bin/containerboot
