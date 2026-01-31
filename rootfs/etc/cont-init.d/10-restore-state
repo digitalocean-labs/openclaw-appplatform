@@ -8,8 +8,10 @@ done
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 
-# Ensure directories exist
-mkdir -p "$MOLTBOT_STATE_DIR" "$MOLTBOT_WORKSPACE_DIR" "$TS_STATE_DIR"
+# Ensure directories exist (only if variables are set)
+[ -n "$MOLTBOT_STATE_DIR" ] && mkdir -p "$MOLTBOT_STATE_DIR"
+[ -n "$MOLTBOT_WORKSPACE_DIR" ] && mkdir -p "$MOLTBOT_WORKSPACE_DIR"
+[ -n "$TS_STATE_DIR" ] && mkdir -p "$TS_STATE_DIR"
 
 # Check if persistence is configured
 if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
