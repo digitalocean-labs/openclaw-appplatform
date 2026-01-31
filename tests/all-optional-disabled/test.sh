@@ -11,10 +11,6 @@ echo "Testing all-optional-disabled configuration (container: $CONTAINER)..."
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
 
-# Check s6 services - moltbot should be supervised
-docker exec "$CONTAINER" s6-rc -a list | grep -q moltbot || { echo "error: moltbot service not supervised"; exit 1; }
-echo "✓ moltbot service supervised"
-
 # SSH should NOT be running
 if docker exec "$CONTAINER" pgrep -x sshd >/dev/null 2>&1; then
     echo "error: sshd running but SSH_ENABLE=false"

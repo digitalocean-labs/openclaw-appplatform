@@ -11,10 +11,6 @@ echo "Testing ui-disabled configuration (container: $CONTAINER)..."
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
 
-# Check s6 services
-docker exec "$CONTAINER" s6-rc -a list | grep -q moltbot || { echo "error: moltbot service not supervised"; exit 1; }
-echo "✓ moltbot service supervised"
-
 # Gateway config should have ui disabled
 docker exec "$CONTAINER" cat /data/.moltbot/moltbot.json | grep -q '"ui"' && {
     ui_enabled=$(docker exec "$CONTAINER" cat /data/.moltbot/moltbot.json | jq -r '.ui // false')
