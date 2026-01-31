@@ -17,6 +17,18 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:master
+            network=host
+
+      - name: Expose GitHub Actions cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
 
       - name: Create minimal .env for testing
         run: |
@@ -32,6 +44,11 @@ jobs:
 
       - name: Build and start container
         run: make rebuild
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
 
       - name: Wait for services
         run: sleep 10
