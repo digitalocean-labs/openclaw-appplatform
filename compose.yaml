@@ -1,8 +1,9 @@
 services:
   openclaw-gateway:
+    image: ${IMAGE:-openclaw-test:latest}
     build:
       context: .
       dockerfile: Dockerfile
     platform: ${PLATFORM:-linux/amd64}
-    container_name: ${CONTAINER_NAME:-openclaw-test}
+    container_name: ${STABLE_HOSTNAME:-openclaw-test}
     env_file: .env
