@@ -3,10 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      cache_from:
-        - type=local,src=/tmp/.buildx-cache
-      cache_to:
-        - type=local,dest=/tmp/.buildx-cache-new,mode=max
     platform: ${PLATFORM:-linux/amd64}
     container_name: ${CONTAINER_NAME:-moltbot-test}
     env_file: .env
