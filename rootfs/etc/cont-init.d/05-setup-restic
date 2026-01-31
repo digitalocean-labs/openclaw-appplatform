@@ -72,7 +72,7 @@ done < <(env | grep -E '^RESTIC_')
 
 # Initialize restic repo if it doesn't exist
 echo "[setup-restic] Checking if restic repository exists..."
-if restic snapshots | tail -n 20 2>/dev/null; then
+if restic snapshots 2>/dev/null | tail -n 20; then
   echo "[setup-restic] Restic repository already initialized"
 else
   echo "[setup-restic] Initializing restic repository..."
