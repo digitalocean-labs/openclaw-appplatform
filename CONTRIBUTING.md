@@ -32,7 +32,9 @@ ENABLE_NGROK=false
 ENABLE_SPACES=false
 SSH_ENABLE=false
 ENABLE_UI=true
-STABLE_HOSTNAME=moltbot-test
+# IMPORTANT: STABLE_HOSTNAME must match the config filename (without .env)
+# This is used as the container name and passed to test scripts
+STABLE_HOSTNAME=my-new-config
 S6_BEHAVIOUR_IF_STAGE2_FAILS=0
 ```
 
@@ -43,13 +45,16 @@ S6_BEHAVIOUR_IF_STAGE2_FAILS=0
 # tests/my-new-config/test.sh
 set -e
 
-echo "Testing my-new-config..."
+# Container name is passed as first argument
+CONTAINER=${1:?Usage: $0 <container-name>}
+
+echo "Testing my-new-config (container: $CONTAINER)..."
 
 # Container should be running
-docker exec moltbot-test true || { echo "error: container not responsive"; exit 1; }
+docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
 
 # Check s6 services
-docker exec moltbot-test s6-rc -a list | grep -q moltbot || { echo "error: moltbot service not supervised"; exit 1; }
+docker exec "$CONTAINER" s6-rc -a list | grep -q moltbot || { echo "error: moltbot service not supervised"; exit 1; }
 echo "✓ moltbot service supervised"
 
 # Add your specific verifications here...
@@ -81,28 +86,30 @@ chmod +x tests/my-new-config/test.sh
 
 Each configuration has a corresponding test script in `tests/<config-name>/test.sh`. Test scripts:
 
+- Receive the container name as the first argument (`$1`)
 - Run after the container starts and services initialize
 - Should use `set -e` to fail fast on errors
-- Can use `docker exec moltbot-test <command>` to run commands in the container
 - Should verify expected services are running and unexpected services are NOT running
 
 Common verification patterns:
 
 ```bash
+CONTAINER=${1:?Usage: $0 <container-name>}
+
 # Check s6 service is supervised
-docker exec moltbot-test s6-rc -a list | grep -q <service>
+docker exec "$CONTAINER" s6-rc -a list | grep -q <service>
 
 # Check process is running
-docker exec moltbot-test pgrep -x <process>
+docker exec "$CONTAINER" pgrep -x <process>
 
 # Check process is NOT running
-if docker exec moltbot-test pgrep -x <process> >/dev/null 2>&1; then
+if docker exec "$CONTAINER" pgrep -x <process> >/dev/null 2>&1; then
     echo "error: <process> should not be running"
     exit 1
 fi
 
 # Check port is listening
-docker exec moltbot-test ss -tlnp | grep -q ":<port> "
+docker exec "$CONTAINER" ss -tlnp | grep -q ":<port> "
 ```
 
 ### Running Tests Locally
@@ -115,13 +122,13 @@ make rebuild
 # Wait for services to start
 sleep 10
 
-# Run the test script
-./tests/minimal/test.sh
+# Run the test script (container name = config name = "minimal")
+./tests/minimal/test.sh minimal
 
 # Or check manually
-make logs
-docker exec moltbot-test ps aux
-docker exec moltbot-test s6-rc -a list
+docker logs minimal
+docker exec minimal ps aux
+docker exec minimal s6-rc -a list
 
 # Clean up
 docker compose down
