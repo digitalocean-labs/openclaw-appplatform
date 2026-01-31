@@ -22,6 +22,7 @@ if [ -z "$RESTIC_SPACES_ACCESS_KEY_ID" ] || [ -z "$RESTIC_SPACES_SECRET_ACCESS_K
   echo "[restore-state] ERROR: RESTIC_SPACES_ACCESS_KEY_ID or RESTIC_SPACES_SECRET_ACCESS_KEY not set"
   exit 1
 fi
+export AWS_ACCESS_KEY_ID="$RESTIC_SPACES_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$RESTIC_SPACES_SECRET_ACCESS_KEY"
 export RESTIC_SPACES_ACCESS_KEY_ID RESTIC_SPACES_SECRET_ACCESS_KEY RESTIC_REPOSITORY RESTIC_PASSWORD
 
 # Check if config exists
@@ -31,7 +32,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Check if repository has any snapshots
-if ! restic snapshots latest 1 2>/dev/null | grep -q .; then
+if ! restic snapshots --latest 1 2>/dev/null | grep -q 'ID'; then
   echo "[restore-state] No snapshots found in repository, skipping"
   exit 0
 fi
@@ -48,14 +49,22 @@ echo "[restore-state] Restoring $PATH_COUNT paths..."
 
 for i in $(seq 0 $((PATH_COUNT - 1))); do
   RESTORE_PATH=$(yq -r ".paths[$i].path" "$CONFIG_FILE")
-  
+
   # Ensure parent directory exists
   mkdir -p "$(dirname "$RESTORE_PATH")"
-  
+
+  # Find latest snapshot for this specific path
+  SNAPSHOT_ID=$(restic snapshots --path "$RESTORE_PATH" --latest 1 --json 2>/dev/null | jq -r '.[0].id // empty')
+
+  if [ -z "$SNAPSHOT_ID" ]; then
+    echo "[restore-state] No snapshot found for $RESTORE_PATH, skipping"
+    continue
+  fi
+
   echo "[restore-state] Restoring: $RESTORE_PATH (snapshot $SNAPSHOT_ID)"
-  
+
   # Run restic restore from the snapshot that contains this path
-  if restic restore latest --target / --include "$RESTORE_PATH" 2>&1; then
+  if restic restore "$SNAPSHOT_ID" --target / --include "$RESTORE_PATH" 2>&1; then
     echo "[restore-state] Completed: $RESTORE_PATH"
   else
     echo "[restore-state] Warning: Restore may have had issues for $RESTORE_PATH (continuing)"
