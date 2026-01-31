@@ -1,0 +1,26 @@
+name: Test Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build --platform linux/amd64 -t moltbot-test .
+          if [ $? -ne 0 ]; then
+            echo "error: Docker build failed"
+            exit 1
+          fi
