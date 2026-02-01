@@ -7,7 +7,7 @@ Deploy [OpenClaw](https://github.com/openclaw/openclaw) - a multi-channel AI mes
 ## Quick Start: Choose Your Stage
 
 | Stage                   | What You Get            | Access Method        |
-| ----------------------- | ----------------------- | -------------------- |
+|-------------------------|-------------------------|----------------------|
 | **1. CLI Only**         | Gateway + CLI           | `doctl apps console` |
 | **2. + Web UI + ngrok** | Control UI + Public URL | ngrok URL            |
 | **3. + Tailscale**      | Private Network         | Tailscale hostname   |
@@ -147,6 +147,8 @@ Private network access via your Tailscale tailnet. **Recommended for production.
 
 ### Get Tailscale Auth Key
 
+See [Setting up Tailscale](#setting-up-tailscale) for a detailed walkthrough with screenshots.
+
 1. Go to <https://login.tailscale.com/admin/settings/keys>
 2. Generate a reusable auth key
 
@@ -181,6 +183,69 @@ https://openclaw.<your-tailnet>.ts.net
 - ✅ Private access (only your devices)
 - ✅ Production-grade security
 - ❌ Data lost on restart (add Spaces for persistence)
+
+---
+
+## Setting up Tailscale
+
+This section walks you through creating a Tailscale auth key for your OpenClaw deployment.
+
+### 1. Sign in to Tailscale
+
+Go to <https://login.tailscale.com> and sign in with your preferred identity provider (Google, Microsoft, GitHub, etc.).
+
+### 2. Access the Admin Console
+
+Once signed in, you'll be taken to the Tailscale admin console. This is where you manage your tailnet (your private network).
+
+### 3. Navigate to Auth Keys
+
+1. Click **Settings** in the left sidebar
+2. Click **Keys** under the Personal Settings section
+3. Or go directly to <https://login.tailscale.com/admin/settings/keys>
+
+<!-- Screenshot: Settings > Keys navigation -->
+
+### 4. Generate an Auth Key
+
+1. Click **Generate auth key**
+2. Configure the key settings:
+   - **Reusable**: Enable this so the key can be used if the container restarts
+   - **Ephemeral**: Optional - nodes using this key will be automatically removed when they go offline
+   - **Tags**: Optional - apply ACL tags to control access
+   - **Expiration**: Choose an appropriate expiration (default is 90 days)
+
+![Tailscale Auth Key Settings](ts-auth-key.png)
+
+### 5. Copy Your Auth Key
+
+After clicking **Generate key**, your auth key will be displayed. Copy it immediately as it won't be shown again.
+
+The key format looks like: `tskey-auth-xxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxx`
+
+<!-- Screenshot: Auth key displayed -->
+
+### 6. Add the Key to Your Deployment
+
+Set the `TS_AUTHKEY` environment variable in your `app.yaml` or in the DigitalOcean dashboard:
+
+```yaml
+envs:
+  - key: TS_AUTHKEY
+    type: SECRET
+    value: "tskey-auth-xxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+### 7. Verify the Connection
+
+After deploying, your OpenClaw instance will appear in the **Machines** tab of your Tailscale admin console.
+
+<!-- Screenshot: Machines list showing openclaw -->
+
+You can access your instance at:
+```
+https://<hostname>.<your-tailnet>.ts.net
+```
 
 ---
 
@@ -224,7 +289,7 @@ envs:
 The backup system uses [Restic](https://restic.net/) for incremental, encrypted snapshots to DigitalOcean Spaces.
 
 | Path              | Contents                                         | Backup Frequency         |
-| ----------------- | ------------------------------------------------ | ------------------------ |
+|-------------------|--------------------------------------------------|--------------------------|
 | `/data/.openclaw` | Gateway config, channel sessions, agents, memory | Every 30s (configurable) |
 | `/data/tailscale` | Tailscale connection state (persistent device)   | Every 30s                |
 | `/etc`            | System configuration                             | Every 30s                |
@@ -299,14 +364,14 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 ### Required
 
 | Variable                 | Description                         |
-| ------------------------ | ----------------------------------- |
+|--------------------------|-------------------------------------|
 | `OPENCLAW_GATEWAY_TOKEN` | Password for web setup wizard       |
 | `STABLE_HOSTNAME`        | A stable hostname for this instance |
 
 ### Feature Flags
 
 | Variable           | Default | Description                  |
-| ------------------ | ------- | ---------------------------- |
+|--------------------|---------|------------------------------|
 | `ENABLE_NGROK`     | `false` | Enable ngrok tunnel          |
 | `ENABLE_TAILSCALE` | `false` | Enable Tailscale             |
 | `ENABLE_SPACES`    | `false` | Enable DO Spaces persistence |
@@ -316,19 +381,19 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 ### ngrok (when ENABLE_NGROK=true)
 
 | Variable          | Description           |
-| ----------------- | --------------------- |
+|-------------------|-----------------------|
 | `NGROK_AUTHTOKEN` | Your ngrok auth token |
 
 ### Tailscale (when TAILSCALE_ENABLE=true)
 
 | Variable     | Description        |
-| ------------ | ------------------ |
+|--------------|--------------------|
 | `TS_AUTHKEY` | Tailscale auth key |
 
 ### Spaces (when ENABLE_SPACES=true)
 
 | Variable                          | Description                         |
-| --------------------------------- | ----------------------------------- |
+|-----------------------------------|-------------------------------------|
 | `RESTIC_SPACES_ACCESS_KEY_ID`     | Spaces access key                   |
 | `RESTIC_SPACES_SECRET_ACCESS_KEY` | Spaces secret key                   |
 | `RESTIC_SPACES_ENDPOINT`          | e.g., `tor1.digitaloceanspaces.com` |
@@ -338,7 +403,7 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 ### Optional
 
 | Variable                 | Description                                    |
-| ------------------------ | ---------------------------------------------- |
+|--------------------------|------------------------------------------------|
 | `OPENCLAW_GATEWAY_TOKEN` | Gateway auth token (auto-generated if not set) |
 | `GRADIENT_API_KEY`       | DigitalOcean Gradient AI key                   |
 | `GITHUB_USERNAME`        | For SSH key fetching                           |
@@ -353,12 +418,12 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 
 On login, you'll see a colorful status display. Run `motd` anytime to refresh.
 
-| Section | Info |
-|---------|------|
-| 🖥️ System | Hostname, uptime, load, memory, disk (color-coded) |
-| 🔗 Tailscale | Status, IP, relay, serve URL (if enabled) |
-| 🦞 OpenClaw | Health status, configured channels, agent count |
-| 📚 Links | OpenClaw docs, App Platform docs, source repo |
+| Section      | Info                                               |
+|--------------|----------------------------------------------------|
+| 🖥️ System   | Hostname, uptime, load, memory, disk (color-coded) |
+| 🔗 Tailscale | Status, IP, relay, serve URL (if enabled)          |
+| 🦞 OpenClaw  | Health status, configured channels, agent count    |
+| 📚 Links     | OpenClaw docs, App Platform docs, source repo      |
 
 ### Add Custom Init Scripts
 
@@ -381,7 +446,7 @@ exec my-daemon --foreground
 ### Built-in Services
 
 | Service     | Description                                              |
-| ----------- | -------------------------------------------------------- |
+|-------------|----------------------------------------------------------|
 | `openclaw`  | OpenClaw gateway                                         |
 | `ngrok`     | ngrok tunnel (if enabled)                                |
 | `tailscale` | Tailscale daemon (if enabled)                            |
@@ -395,7 +460,7 @@ exec my-daemon --foreground
 ## Available Regions
 
 | Code  | Location          |
-| ----- | ----------------- |
+|-------|-------------------|
 | `nyc` | New York          |
 | `atl` | Atlanta           |
 | `ams` | Amsterdam         |
