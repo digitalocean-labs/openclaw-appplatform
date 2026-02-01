@@ -11,13 +11,16 @@ make shell                 # Shell into container
 
 ## How It Works
 
-CI runs a matrix of test configurations via GitHub Actions (`.github/workflows/test.yml`):
+CI runs a two-stage matrix via GitHub Actions (`.github/workflows/test.yml`):
 
-- Builds Docker image once with layer caching
-- Runs one parallel job per config in `example_configs/`
-- Within each job, all `.sh` scripts in `tests/<config>/` run serially in sorted order
-- Same container is used for all scripts in a config (matches local behavior)
-- Shared utilities in `tests/lib.sh` (wait_for_container, assert_service_up/down, etc.)
+1. **Build**: Builds Docker image once with layer caching
+2. **Setup**: One job per config - validates container starts correctly
+3. **Scenario**: One job per (config, script) pair - runs after all setup jobs complete
+
+The dependency graph shows: `build → setup (config) → scenario (config, script)`
+
+Locally, scripts run serially in sorted order within a single container per config.
+Shared utilities in `tests/lib.sh` (wait_for_container, assert_service_up/down, etc.)
 
 ## Writing Tests
 
@@ -61,8 +64,8 @@ tests/all-optional-disabled/
 └── 03-persistence-disabled.sh # Backup/prune not running
 ```
 
-Both locally and in CI, scripts run sequentially in sorted order within a single container per config.
-CI shows jobs like `test (ssh-enabled)`, `test (minimal)`, etc.
+In CI, each script runs as a separate job (e.g., `scenario (ssh-enabled, 01-service.sh)`).
+Locally, scripts run sequentially in sorted order within a single container.
 
 ## s6 Service Checks
 
