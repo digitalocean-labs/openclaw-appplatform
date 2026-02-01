@@ -101,6 +101,7 @@ jobs:
 
           # Inject Spaces credentials for persistence test
           if [ "${{ matrix.config }}" = "persistence-enabled" ] && [ -n "$BUCKET_NAME" ]; then
+            echo "" >> .env  # Ensure newline before appending
             echo "RESTIC_SPACES_ACCESS_KEY_ID=$DO_SPACES_ACCESS_KEY_ID" >> .env
             echo "RESTIC_SPACES_SECRET_ACCESS_KEY=$DO_SPACES_SECRET_ACCESS_KEY" >> .env
             echo "RESTIC_SPACES_ENDPOINT=$SPACES_ENDPOINT" >> .env

@@ -19,8 +19,8 @@ wait_for_process "$CONTAINER" "sshd" || { echo "error: sshd not running but SSH_
 docker exec "$CONTAINER" bash -c 'echo > /dev/tcp/127.0.0.1/22' 2>/dev/null || { echo "error: SSH not listening on port 22"; exit 1; }
 echo "✓ SSH listening on port 22"
 
-# Authorized keys should be set up
-docker exec "$CONTAINER" test -f /root/.ssh/authorized_keys || { echo "error: authorized_keys not found"; exit 1; }
+# Authorized keys should be set up (in ubuntu user's home)
+docker exec "$CONTAINER" test -f /home/ubuntu/.ssh/authorized_keys || { echo "error: authorized_keys not found"; exit 1; }
 echo "✓ authorized_keys exists"
 
 echo "ssh-enabled tests passed"
