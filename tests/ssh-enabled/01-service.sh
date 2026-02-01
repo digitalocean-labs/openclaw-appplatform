@@ -61,8 +61,10 @@ echo "=== Local SSH Tests (inside container) ==="
 # Test all user combinations
 assert_ssh_works "$CONTAINER" ubuntu ubuntu || exit 1
 assert_ssh_works "$CONTAINER" ubuntu root || exit 1
+assert_ssh_works "$CONTAINER" ubuntu openclaw || exit 1
 assert_ssh_works "$CONTAINER" root ubuntu || exit 1
 assert_ssh_works "$CONTAINER" root root || exit 1
+assert_ssh_works "$CONTAINER" root openclaw || exit 1
 
 # Test command execution
 echo "Testing command execution via SSH..."

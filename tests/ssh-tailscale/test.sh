@@ -24,8 +24,10 @@ echo "=== Local SSH Tests (inside container) ==="
 # Test local SSH connectivity for all user combinations
 assert_ssh_works "$CONTAINER" ubuntu ubuntu || exit 1
 assert_ssh_works "$CONTAINER" ubuntu root || exit 1
+assert_ssh_works "$CONTAINER" ubuntu openclaw || exit 1
 assert_ssh_works "$CONTAINER" root ubuntu || exit 1
 assert_ssh_works "$CONTAINER" root root || exit 1
+assert_ssh_works "$CONTAINER" root openclaw || exit 1
 
 # Test command execution via local SSH
 echo "Testing command execution via local SSH..."
@@ -95,29 +97,44 @@ else
                 echo "✓ Tailscale network connectivity established"
                 break
             fi
-            [ $i -eq 30 ] && { echo "warning: Tailscale ping failed, continuing anyway"; }
+            if [ "$i" -eq 30 ]; then
+                echo "error: Tailscale ping to $TS_IP failed after 60s"
+                echo "Sidecar status:"
+                docker exec tailscale-test tailscale status 2>&1 || true
+                echo "Container status:"
+                docker exec "$CONTAINER" tailscale status 2>&1 || true
+                exit 1
+            fi
             sleep 2
         done
 
-        # Debug: show tailscale status on both sides
-        echo "Sidecar Tailscale status:"
-        docker exec tailscale-test tailscale status 2>&1 | head -10
-
         # Test SSH from sidecar to main container via Tailscale IP
         echo "Testing SSH to $TS_IP from Tailscale sidecar..."
-        SSH_RESULT=$(docker exec tailscale-test ssh -v -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        if ! docker exec tailscale-test ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -o BatchMode=yes -o ConnectTimeout=30 -i /tmp/id_ed25519_test \
-            "ubuntu@$TS_IP" 'whoami' 2>&1) || true
-        if echo "$SSH_RESULT" | grep -q "ubuntu"; then
-            echo "✓ SSH via Tailscale IP works"
+            "ubuntu@$TS_IP" 'whoami' 2>/dev/null | grep -q ubuntu; then
+            echo "error: SSH via Tailscale IP failed"
+            echo "Debug - sidecar tailscale status:"
+            docker exec tailscale-test tailscale status 2>&1 || true
+            exit 1
+        fi
+        echo "✓ SSH via Tailscale IP works"
+
+        # Test chained SSH via Tailscale
+        echo "Testing chained SSH via Tailscale (sidecar -> ubuntu -> root)..."
+        RESULT=$(docker exec tailscale-test ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o BatchMode=yes -o ConnectTimeout=30 -i /tmp/id_ed25519_test \
+            "ubuntu@$TS_IP" \
+            'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes root@localhost whoami' 2>/dev/null || echo "FAILED")
+        if [ "$RESULT" = "root" ]; then
+            echo "✓ Chained SSH via Tailscale works"
         else
-            echo "warning: SSH via Tailscale IP failed (non-critical in CI)"
-            echo "  Debug output: $SSH_RESULT"
-            # Don't fail the test - Tailscale networking in CI can be flaky
-            echo "  Skipping Tailscale SSH tests due to network issues"
+            echo "error: Chained SSH via Tailscale failed, got: $RESULT"
+            exit 1
         fi
     else
-        echo "warning: Tailscale sidecar not running, skipping Tailscale network SSH tests"
+        echo "error: Tailscale sidecar not running"
+        exit 1
     fi
 fi
 
