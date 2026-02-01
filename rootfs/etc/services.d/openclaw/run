@@ -1,13 +1,11 @@
-#!/command/with-contenv bash
+#!/bin/bash
 # OpenClaw gateway service
+source /etc/s6-overlay/lib/env-utils.sh
 
 echo "[openclaw] Starting openclaw gateway..."
+# Allow openclaw to use tailscale
+if [ "${TAILSCALE_ENABLE:-false}" = "true" ]; then
+    tailscale set --operator=openclaw
+fi
 
-# Run as openclaw user with proper environment
-export HOME=/home/openclaw
-exec s6-setuidgid openclaw bash -c '
-  export HOME=/home/openclaw
-  source /home/openclaw/.bashrc
-  source /home/openclaw/.profile
-  openclaw gateway --allow-unconfigured
-' > /proc/1/fd/1 2>&1
+with_env_prefix --user openclaw OPENCLAW_ -- openclaw gateway --allow-unconfigured

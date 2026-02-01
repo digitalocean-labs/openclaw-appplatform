@@ -1,57 +1,34 @@
 #!/command/with-contenv bash
 # Setup Tailscale
+source /etc/s6-overlay/lib/env-utils.sh
 
 echo "[tailscale] Setting up Tailscale"
 
-
-if [ "${ENABLE_TAILSCALE:-false}" != "true" ]; then
-  echo "[tailscale] Disabled (set ENABLE_TAILSCALE=true to enable)"
-  s6-svc -Od .
+if [ "${TAILSCALE_ENABLE:-false}" != "true" ]; then
+  echo "[tailscale] Disabled (set TAILSCALE_ENABLE=true to enable)"
   exit 0
 fi
 
-# Set defaults for TS_ variables and export them
-export TS_HOSTNAME=${STABLE_HOSTNAME:-openclaw}
-export TS_SOCKET=${TS_SOCKET:-/tmp/tailscaled.sock}
-export TS_USERSPACE=${TS_USERSPACE:-true}
-export TS_STATE_DIR=${TS_STATE_DIR:-/data/tailscale}
-export ENABLE_TAILSCALE=${ENABLE_TAILSCALE:-false}
+persist_env_prefix TS_
 
-# Ensure environment directory exists
-mkdir -p /run/s6/container_environment
+# Persist TS_ vars with defaults
+persist_env_var TS_ \
+  TS_HOSTNAME="${STABLE_HOSTNAME}" \
+  TS_SOCKET=/tmp/tailscaled.sock \
+  TS_USERSPACE=true \
+  TS_STATE_DIR=/data/tailscale \
+  TAILSCALE_ENABLE="${TAILSCALE_ENABLE:-false}"
 
-# Write all TS_ prefixed environment variables (idempotent - overwrites are safe)
-while IFS='=' read -r var value; do
-  echo "$value" > "/run/s6/container_environment/$var" || {
-    echo "[tailscale] Warning: Failed to write $var" >&2
-  }
-done < <(env | grep -E '^TS_')
+# Also persist any existing TS_ vars from environment
+persist_env_prefix TS_
 
-# Set ownership of TS_ environment files to tailscale (the user that runs the service)
-chown root:root /run/s6/container_environment/TS_* 2>/dev/null || {
-  echo "[tailscale] Warning: Failed to set ownership of TS_ environment files" >&2
-    exit 1
-}
-
-# Secure TS_ environment files with restrictive permissions
-# Set all TS_* files to 400 (owner read only)
-chmod 400 /run/s6/container_environment/TS_* 2>/dev/null || {
-  echo "[tailscale] Warning: Failed to secure TS_ environment files" >&2
-    exit 1
-}
-
-# Create state directory and set ownership to tailscale (idempotent)
-mkdir -p "$TS_STATE_DIR"
-chown -R root:root "$TS_STATE_DIR" || {
-  echo "[tailscale] Warning: Failed to set ownership of $TS_STATE_DIR" >&2
+# Create state directory
+TS_STATE_DIR="${TS_STATE_DIR:-/data/tailscale}"
+if ! mkdir -p "$TS_STATE_DIR"; then
+  echo "[tailscale] ERROR: Failed to create state directory: $TS_STATE_DIR" >&2
   exit 1
-}
+fi
 
-# Secure state directory permissions (700: owner read/write)
-# The Tailscale service runs as tailscale user, so it needs write access
-chmod 0700 "$TS_STATE_DIR" || {
-  echo "[tailscale] Warning: Failed to secure $TS_STATE_DIR" >&2
-    exit 1
-}
+# Permissions applied via /etc/digitalocean/permissions.yaml
 
 echo "[tailscale] Setup complete"

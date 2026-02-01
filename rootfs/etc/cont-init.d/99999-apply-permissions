@@ -1,0 +1,8 @@
+#!/command/with-contenv bash
+
+# Permissions should be applied LAST
+
+source /etc/s6-overlay/lib/env-utils.sh
+
+# Apply runtime permissions
+apply_permissions

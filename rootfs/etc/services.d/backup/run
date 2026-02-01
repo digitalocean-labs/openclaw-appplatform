@@ -1,12 +1,7 @@
-#!/command/with-contenv bash
+#!/bin/bash
 # Periodic backup service using restic
-
-# Source s6 container environment (ensures vars are available)
-for f in /run/s6/container_environment/RESTIC_*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
-done
-
-CONFIG_FILE="/etc/openclaw/backup.yaml"
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix RESTIC_
 
 # Skip if ENABLE_SPACES is not true
 if [ "${ENABLE_SPACES:-false}" != "true" ]; then
@@ -16,14 +11,14 @@ if [ "${ENABLE_SPACES:-false}" != "true" ]; then
 fi
 
 # Skip if persistence not configured
-if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
-  echo "[backup] ENABLE_SPACES=true but RESTIC_REPOSITORY or RESTIC_PASSWORD not set"
+if [ -z "$RESTIC_REPOSITORY" ] ; then
+  echo "[backup] ENABLE_SPACES=true but RESTIC_REPOSITORY not set"
   s6-svc -Od .
-  exit 0
+  exit 1
 fi
 
 # Read backup interval from config (default 30 seconds)
-BACKUP_INTERVAL=$(yq -r '.backup_interval_seconds // 30' "$CONFIG_FILE")
+BACKUP_INTERVAL=$(yq -r '.backup_interval_seconds // 30' "$RESTIC_BACKUP_CONFIG_FILE")
 echo "[backup] Starting backup loop (every ${BACKUP_INTERVAL}s)..."
 
 while true; do

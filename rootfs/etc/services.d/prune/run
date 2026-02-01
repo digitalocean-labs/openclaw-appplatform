@@ -1,12 +1,9 @@
-#!/command/with-contenv bash
+#!/bin/bash
 # Periodic prune service using restic
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix RESTIC_
 
-# Source s6 container environment (ensures vars are available)
-for f in /run/s6/container_environment/*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
-done
-
-CONFIG_FILE="/etc/openclaw/backup.yaml"
+CONFIG_FILE="${RESTIC_BACKUP_CONFIG_FILE:-/etc/digitalocean/backup.yaml}"
 
 # Skip if ENABLE_SPACES is not true
 if [ "${ENABLE_SPACES:-false}" != "true" ]; then

@@ -14,7 +14,7 @@ spec:
         repository: bikramkgupta/openclaw-appplatform
         tag: latest
       instance_count: 1
-      instance_size_slug: apps-s-1vcpu-2gb  # Minimum 2GB required - 1GB causes heap overflow
+      instance_size_slug: apps-s-1vcpu-2gb # Minimum 2GB required - 1GB causes heap overflow
       envs:
         # Provide your Gradient inference key
         - key: GRADIENT_API_KEY
@@ -22,7 +22,7 @@ spec:
           type: SECRET
 
         # Required
-        - key: SETUP_PASSWORD
+        - key: OPENCLAW_GATEWAY_TOKEN
           scope: RUN_TIME
           type: SECRET
 
@@ -30,7 +30,7 @@ spec:
         - key: ENABLE_NGROK
           scope: RUN_TIME
           value: "false"
-        - key: ENABLE_TAILSCALE
+        - key: TAILSCALE_ENABLE
           scope: RUN_TIME
           value: "false"
         - key: ENABLE_SPACES

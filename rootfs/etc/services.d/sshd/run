@@ -1,9 +1,10 @@
-#!/command/with-contenv bash
+#!/bin/bash
 # SSH server (optional, enabled via SSH_ENABLE=true)
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix SSH_
 
 if [ "${SSH_ENABLE:-false}" != "true" ]; then
   echo "[sshd] SSH disabled (set SSH_ENABLE=true to enable)"
-  # Mark this service as down so s6 doesn't restart it
   s6-svc -Od .
   exit 0
 fi

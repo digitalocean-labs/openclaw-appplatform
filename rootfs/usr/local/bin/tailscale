@@ -3,7 +3,10 @@ set -e
 
 # Proxy entire command line to real_tailscale and add the socket path from TS_SOCKET if not already present
 
-
+# Load TS_ env vars
+for f in /run/s6/container_environment/TS_/*; do
+  [ -f "$f" ] && export "$(basename "$f")"="$(cat "$f")"
+done
 
 ARGS=("$@")
 
@@ -15,17 +18,10 @@ for arg in "${ARGS[@]}"; do
 	esac
 done
 
-
 # Insert --socket as the first argument if not present
 if [ "$SOCKET_PRESENT" = false ]; then
 	SOCKET_ARG="--socket=${TS_SOCKET:-/tmp/tailscaled.sock}"
 	ARGS=("$SOCKET_ARG" "${ARGS[@]}")
 fi
-
-
-# echo "Executing: $0"
-# for arg in "${ARGS[@]}"; do
-# 	echo "arg: $arg"
-# done
 
 exec "$(dirname "$0")/real_tailscale" "${ARGS[@]}"

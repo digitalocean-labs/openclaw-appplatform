@@ -1,22 +1,19 @@
-#!/command/with-contenv bash
-# Tailscale daemon (enabled via ENABLE_TAILSCALE=true)
+#!/bin/bash
+# Tailscale daemon (enabled via TAILSCALE_ENABLE=true)
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix TS_
 
-if [ "${ENABLE_TAILSCALE:-false}" != "true" ]; then
-  echo "[tailscale] Disabled (set ENABLE_TAILSCALE=true to enable)"
+if [ "${TAILSCALE_ENABLE:-false}" != "true" ]; then
+  echo "[tailscale] Disabled (set TAILSCALE_ENABLE=true to enable)"
   s6-svc -Od .
   exit 0
 fi
 
-# Source s6 container environment (ensures vars are available)
-for f in /run/s6/container_environment/TS_*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
-done
-
 if [ -z "$TS_AUTHKEY" ]; then
-  echo "[tailscale] ERROR: ENABLE_TAILSCALE=true but TS_AUTHKEY not set" >&2
+  echo "[tailscale] ERROR: TAILSCALE_ENABLE=true but TS_AUTHKEY not set" >&2
   s6-svc -Od .
   exit 1
 fi
 
 echo "[tailscale] Starting Tailscale daemon..."
-exec /usr/local/bin/containerboot
+with_env_prefix TS_ -- /usr/local/bin/containerboot

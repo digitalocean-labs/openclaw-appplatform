@@ -6,7 +6,7 @@ spec:
       dockerfile_path: /Dockerfile
       source_dir: /
       instance_count: 1
-      instance_size_slug: apps-s-1vcpu-2gb  # Minimum 2GB required - 1GB causes heap overflow
+      instance_size_slug: apps-s-1vcpu-2gb # Minimum 2GB required - 1GB causes heap overflow
       git:
         branch: main
         repo_clone_url: https://github.com/digitalocean-labs/openclaw-appplatform.git
@@ -17,7 +17,7 @@ spec:
           type: SECRET
 
         # Required
-        - key: SETUP_PASSWORD
+        - key: OPENCLAW_GATEWAY_TOKEN
           scope: RUN_TIME
           type: SECRET
         - key: STABLE_HOSTNAME
@@ -28,7 +28,7 @@ spec:
         - key: ENABLE_NGROK
           scope: RUN_TIME
           value: "false"
-        - key: ENABLE_TAILSCALE
+        - key: TAILSCALE_ENABLE
           scope: RUN_TIME
           value: "false"
         - key: ENABLE_SPACES

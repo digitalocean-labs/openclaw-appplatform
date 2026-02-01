@@ -1,5 +1,5 @@
 # OpenClaw Backup Configuration
-# Users can override this file in their rootfs/etc/openclaw/backup.yaml
+# Users can override via RESTIC_BACKUP_CONFIG_FILE env var
 
 # Restic repository location (S3-compatible)
 # Environment variables are expanded at runtime
@@ -18,7 +18,6 @@ paths:
       - "*.lock"
       - "*.pid"
       - "*.sock"
-
 
   - path: /data/tailscale
 

@@ -1,37 +1,47 @@
 #!/command/with-contenv bash
 # Generate openclaw gateway configuration
+source /etc/s6-overlay/lib/env-utils.sh
 
 set -e
+source_env_prefix OPENCLAW_
+
+# OpenClaw requires any env vars consumed in config to exist or else it fails to start.
+persist_env_var OPENCLAW_ GRADIENT_API_KEY=change-me \
+  TAILSCALE_ENABLE="${TAILSCALE_ENABLE:-false}"
+  HOME=/home/openclaw \
+  OPENCLAW_STATE_DIR=/data/.openclaw \
+  OPENCLAW_WORKSPACE_DIR=/data/workspace
+
+# Ensure directories exist (only if variables are set)
+[ -n "$OPENCLAW_STATE_DIR" ] && mkdir -p "$OPENCLAW_STATE_DIR"
+[ -n "$OPENCLAW_WORKSPACE_DIR" ] && mkdir -p "$OPENCLAW_WORKSPACE_DIR"
 
 # Validate mutual exclusivity of ngrok and tailscale
-if [ "${ENABLE_NGROK:-false}" = "true" ] && [ "${ENABLE_TAILSCALE:-false}" = "true" ]; then
-  echo "[generate-config] WARNING: Both ENABLE_NGROK and ENABLE_TAILSCALE are true."
+if [ "${ENABLE_NGROK:-false}" = "true" ] && [ "${TAILSCALE_ENABLE:-false}" = "true" ]; then
+  echo "[generate-config] WARNING: Both ENABLE_NGROK and TAILSCALE_ENABLE are true."
   echo "[generate-config] This doesn't make sense - ngrok is public, Tailscale is private."
   echo "[generate-config] Defaulting to Tailscale (disable ENABLE_NGROK to silence this)."
 fi
 
-# Set HOME to openclaw's home so .profile uses correct paths
-export HOME=/home/openclaw
 
-# Source openclaw profile for PATH setup
-. /home/openclaw/.profile
+# Source openclaw profile for PATH setup (if exists)
+[ -f /home/openclaw/.profile ] && . /home/openclaw/.profile
+[ -f /home/openclaw/.bashrc ] && . /home/openclaw/.bashrc
 
 # Load nvm (needed for openclaw command)
 export NVM_DIR="/home/openclaw/.nvm"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
   . "$NVM_DIR/nvm.sh"
   echo "[generate-config] nvm loaded successfully"
+  # Persist PATH, HOME, NVM_DIR for service to use
+  persist_env_var OPENCLAW_ PATH="$PATH" HOME="$HOME" NVM_DIR="$NVM_DIR" NODE_ENV="$NODE_ENV"
 else
   echo "[generate-config] ERROR: nvm.sh not found at $NVM_DIR/nvm.sh" >&2
   exit 1
 fi
 
-# Ensure state directory exists with correct ownership
-mkdir -p "$openclaw_STATE_DIR"
-chown openclaw:openclaw "$openclaw_STATE_DIR"
-
 DEFAULT_CONFIG="/etc/openclaw/openclaw.default.json"
-CONFIG_FILE="$openclaw_STATE_DIR/openclaw.json"
+CONFIG_FILE="$OPENCLAW_STATE_DIR/openclaw.json"
 
 echo "[generate-config] Building config: $CONFIG_FILE"
 
@@ -47,16 +57,15 @@ fi
 echo "[generate-config] OpenClaw version: $(openclaw --version 2>/dev/null || echo 'unknown')"
 
 # Generate a gateway token if not provided
-if [ -z "$openclaw_GATEWAY_TOKEN" ]; then
-  export openclaw_GATEWAY_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -d '=/+' | head -c 32)
-  echo "[generate-config] Generated gateway token (ephemeral): $openclaw_GATEWAY_TOKEN"
+if [ -z "$OPENCLAW_GATEWAY_TOKEN" ]; then
+  OPENCLAW_GATEWAY_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -d '=/+' | head -c 32)
+  echo "[generate-config] Generated gateway token (ephemeral): $OPENCLAW_GATEWAY_TOKEN"
   echo "[generate-config] Save this token - you'll need it to connect to the Control UI"
 fi
 
 # Write token to s6 environment
-mkdir -p /run/s6/container_environment
-echo "$openclaw_GATEWAY_TOKEN" > /run/s6/container_environment/openclaw_GATEWAY_TOKEN
-echo "[generate-config] Gateway token configured (openclaw_GATEWAY_TOKEN)"
+persist_env_var OPENCLAW_ OPENCLAW_GATEWAY_TOKEN="$OPENCLAW_GATEWAY_TOKEN"
+echo "[generate-config] Gateway token configured (OPENCLAW_GATEWAY_TOKEN)"
 
 # Start with default config as base
 if [ -f "$DEFAULT_CONFIG" ]; then
@@ -68,7 +77,6 @@ else
   echo "[generate-config] Warning: Default config not found, using minimal config"
 fi
 
-
 # Handle ENABLE_UI flag - disable Control UI if set to false
 if [ "${ENABLE_UI:-true}" = "false" ]; then
   echo "[generate-config] Disabling Control UI (ENABLE_UI=false)"
@@ -76,17 +84,19 @@ if [ "${ENABLE_UI:-true}" = "false" ]; then
 fi
 
 # Add Tailscale config when enabled
-if [ "${ENABLE_TAILSCALE:-false}" = "true" ]; then
+if [ "${TAILSCALE_ENABLE:-false}" = "true" ]; then
   echo "[generate-config] Adding Tailscale serve config"
   jq '.gateway.tailscale.resetOnExit = true | .gateway.tailscale.mode = "serve" | .gateway.auth.allowTailscale = true' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 fi
 
 # Add gateway auth token to config
 echo "[generate-config] Adding gateway.auth.token to config"
-jq --arg token "$openclaw_GATEWAY_TOKEN" '.gateway.auth.token = $token | .gateway.auth.mode = "token"' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+jq --arg token "$OPENCLAW_GATEWAY_TOKEN" '.gateway.auth.token = $token | .gateway.auth.mode = "token"' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 
-# Ensure openclaw owns all state files
-chown -R openclaw:openclaw "$openclaw_STATE_DIR"
+# Permissions applied via /etc/digitalocean/permissions.yaml
 
 echo "[generate-config] Final config:"
 jq '.' "$CONFIG_FILE"
+
+persist_env_var OPENCLAW_
+echo "[generate-config] Done generating config"

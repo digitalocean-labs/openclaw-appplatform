@@ -1,0 +1,113 @@
+permissions:
+  # Read-only documentation
+  - path: /docs
+    mode: "0555"
+  - path: /docs/*
+    mode: "0444"
+
+  # Read-only shared libraries
+  - path: /etc/s6-overlay/lib
+    mode: "0555"
+  - path: /etc/s6-overlay/lib/*
+    mode: "0444"
+
+  # Read-only digitalocean config files
+  - path: /etc/digitalocean
+    mode: "0555"
+  - path: /etc/digitalocean/*
+    mode: "0444"
+
+  # s6 container environment files - root only for sensitive data
+  - path: /run/s6/container_environment/**/*
+    user: root
+    group: root
+    mode: "0600"
+
+  # OPENCLAW_ env readable by openclaw service
+  - path: /run/s6/container_environment/OPENCLAW_/**
+    user: openclaw
+    group: openclaw
+    mode: "0644"
+
+  # TS_ env files - root only (contains auth keys)
+  - path: /run/s6/container_environment/TS_/*
+    user: root
+    group: root
+    mode: "0400"
+
+  # OpenClaw state directory
+  - path: /data/.openclaw
+    user: openclaw
+    group: openclaw
+    mode: "0750"
+  - path: /data/.openclaw/**
+    user: openclaw
+    group: openclaw
+
+  # Tailscale state directory
+  - path: /data/tailscale
+    user: openclaw
+    group: openclaw
+    mode: "0750"
+
+  # Cron directories and files
+  - path: /etc/cron.d
+    user: root
+    group: root
+    mode: "0755"
+  - path: /etc/cron.d/*
+    user: root
+    group: root
+    mode: "0644"
+
+  # s6-overlay directories and scripts
+  - path: /etc/cont-init.d
+    user: root
+    group: root
+    mode: "0755"
+  - path: /etc/cont-init.d/*
+    user: root
+    group: root
+    mode: "0755"
+  - path: /etc/services.d
+    user: root
+    group: root
+    mode: "0755"
+  - path: /etc/cont-finish.d
+    user: root
+    group: root
+    mode: "0755"
+  - path: /etc/cont-finish.d/*
+    user: root
+    group: root
+    mode: "0755"
+
+  # SSH directories
+  - path: /etc/ssh
+    user: root
+    group: root
+    mode: "0755"
+  - path: /etc/ssh/sshd_config.d
+    user: root
+    group: root
+    mode: "0755"
+
+  # Sudoers
+  - path: /etc/sudoers.d
+    user: root
+    group: root
+    mode: "0750"
+  - path: /etc/sudoers.d/*
+    user: root
+    group: root
+    mode: "0440"
+
+  # User SSH directories
+  - path: /home/ubuntu/.ssh
+    user: ubuntu
+    group: ubuntu
+    mode: "0700"
+  - path: /home/ubuntu/.ssh/authorized_keys
+    user: ubuntu
+    group: ubuntu
+    mode: "0600"

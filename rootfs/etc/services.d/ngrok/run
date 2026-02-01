@@ -1,5 +1,7 @@
-#!/command/with-contenv bash
+#!/bin/bash
 # ngrok tunnel (enabled via ENABLE_NGROK=true)
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix NGROK_
 
 if [ "${ENABLE_NGROK:-false}" != "true" ]; then
   echo "[ngrok] Disabled (set ENABLE_NGROK=true to enable)"
@@ -17,4 +19,4 @@ fi
 ngrok config add-authtoken "$NGROK_AUTHTOKEN"
 
 echo "[ngrok] Starting tunnel to gateway port 18789..."
-exec ngrok http 18789 --log stdout
+with_env_prefix NGROK_ -- ngrok http 18789 --log stdout

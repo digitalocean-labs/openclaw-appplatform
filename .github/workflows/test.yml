@@ -21,7 +21,7 @@ jobs:
       - name: Create minimal .env for testing
         run: |
           cat > .env << 'EOF'
-          ENABLE_TAILSCALE=false
+          TAILSCALE_ENABLE=false
           ENABLE_NGROK=false
           ENABLE_SPACES=false
           ENABLE_SSH=false

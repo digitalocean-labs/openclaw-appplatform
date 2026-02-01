@@ -1,13 +1,10 @@
 #!/command/with-contenv bash
 # Restore and reinstall user-installed packages from backup
+source /etc/s6-overlay/lib/env-utils.sh
 
-CONFIG_FILE="/etc/openclaw/backup.yaml"
 DPKG_SELECTIONS="/etc/openclaw/dpkg-selections"
 
-# Source s6 container environment
-for f in /run/s6/container_environment/*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
-done
+source_env_prefix RESTIC_
 
 # Check if persistence is configured
 if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
@@ -15,25 +12,19 @@ if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
   exit 0
 fi
 
-# Ensure AWS credentials are exported for restic S3 backend
-if [ -z "$RESTIC_SPACES_ACCESS_KEY_ID" ] || [ -z "$RESTIC_SPACES_SECRET_ACCESS_KEY" ]; then
-  echo "[restore-packages] ERROR: RESTIC_SPACES_ACCESS_KEY_ID or RESTIC_SPACES_SECRET_ACCESS_KEY not set"
-  exit 1
-fi
-export RESTIC_SPACES_ACCESS_KEY_ID RESTIC_SPACES_SECRET_ACCESS_KEY RESTIC_REPOSITORY RESTIC_PASSWORD
-
 # Check if repository has any snapshots
-if ! restic snapshots --latest 1 2>/dev/null | grep -q .; then
+if ! restic snapshots --latest 1 2>/dev/null | grep -q 'ID'; then
   echo "[restore-packages] No snapshots found, skipping"
   exit 0
 fi
 
 # Step 1: Restore dpkg-selections file first (from globally latest /etc snapshot, excluding current container)
-echo "[restore-packages] Restoring package selections from snapshot $ETC_SNAPSHOT..."
+echo "[restore-packages] Restoring package selections from latest snapshot..."
 if restic restore latest --target / --include "$DPKG_SELECTIONS" 2>&1; then
   echo "[restore-packages] Package selections restored"
 else
-  echo "[restore-packages] Warning: Could not restore package selections (continuing)"
+  echo "[restore-packages] Error: Could not restore package selections"
+  exit 1
 fi
 
 # Step 2: Reinstall packages if selections file exists
@@ -48,5 +39,6 @@ if [ -f "$DPKG_SELECTIONS" ]; then
   apt-get dselect-upgrade -y -qq || echo "[restore-packages] Warning: Some packages may have failed to install"
   echo "[restore-packages] Package reinstallation complete"
 else
-  echo "[restore-packages] No package selections found, skipping"
+  echo "[restore-packages] No package selections found."
+  exit 0
 fi

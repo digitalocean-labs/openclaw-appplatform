@@ -90,6 +90,9 @@ RUN set -eux; \
 # Apply rootfs overlay early - allows user creation to use existing home directories
 COPY rootfs/ /
 
+# Apply build-time permissions from config
+RUN source /etc/s6-overlay/lib/env-utils.sh && apply_permissions
+
 # Create non-root user (using existing home directory from rootfs)
 RUN useradd -d /home/openclaw -s /bin/bash openclaw \
     && mkdir -p "${OPENCLAW_STATE_DIR}" "${OPENCLAW_WORKSPACE_DIR}" \

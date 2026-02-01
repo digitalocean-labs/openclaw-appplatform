@@ -7,11 +7,10 @@ This repository contains the Docker configuration and deployment templates for r
 ## Key Files
 
 - `Dockerfile` - Builds image with Ubuntu Noble, s6-overlay, Tailscale, Restic, Homebrew, pnpm, and openclaw
->>>>>>> Stashed changes
 - `app.yaml` - App Platform service configuration (for reference, uses worker for Tailscale)
 - `.do/deploy.template.yaml` - App Platform worker configuration (recommended)
 - `rootfs/etc/openclaw/openclaw.default.json` - Base gateway configuration template
-- `rootfs/etc/openclaw/backup.yaml` - Restic backup configuration (paths, intervals, retention policy)
+- `rootfs/etc/digitalocean/backup.yaml` - Restic backup configuration (paths, intervals, retention policy)
 - `tailscale` - Wrapper script to inject socket path for tailscale CLI
 - `rootfs/` - Overlay directory for custom files and s6 services
 
@@ -25,10 +24,10 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 - `06-restore-packages` - Restores dpkg package list from backup
 - `10-restore-state` - Restores application state from Restic snapshots
 - `15-reinstall-brews` - Reinstalls Homebrew packages from backup (if Homebrew installed)
-- `20-generate-config` - Builds openclaw.json from environment variables
+- `50-generate-config` - Builds openclaw.json from environment variables
 
 **Services** (`rootfs/etc/services.d/`):
-- `tailscale/` - Tailscale daemon (if ENABLE_TAILSCALE=true)
+- `tailscale/` - Tailscale daemon (if TAILSCALE_ENABLE=true)
 - `openclaw/` - OpenClaw gateway
 - `ngrok/` - ngrok tunnel (if ENABLE_NGROK=true)
 - `sshd/` - SSH server (if SSH_ENABLE=true)
@@ -84,13 +83,13 @@ Optional DO Spaces backup via [Restic](https://restic.net/):
 
 **Configuration:**
 - Repository URL: `s3:<endpoint>/<bucket>/<hostname>/restic`
-- Backup paths and intervals defined in `/etc/openclaw/backup.yaml`
+- Backup paths and intervals defined in `/etc/digitalocean/backup.yaml`
 - Encrypted with `RESTIC_PASSWORD`
 - Access via Spaces credentials (`RESTIC_SPACES_ACCESS_KEY_ID`, `RESTIC_SPACES_SECRET_ACCESS_KEY`)
 
 ## Customizing Backup Configuration
 
-The backup system is configured via `/etc/openclaw/backup.yaml`:
+The backup system is configured via `/etc/digitalocean/backup.yaml`:
 
 ```yaml
 # Repository location (S3-compatible, variables expanded at runtime)
@@ -117,7 +116,7 @@ retention:
   keep_monthly: 6    # Keep 6 monthly snapshots
 ```
 
-To customize, add your own `rootfs/etc/openclaw/backup.yaml` and rebuild the image.
+To customize, add your own `rootfs/etc/digitalocean/backup.yaml` and rebuild the image.
 
 ## Development
 

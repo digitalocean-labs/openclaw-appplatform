@@ -1,15 +1,15 @@
 #!/bin/bash
 # Unified backup script using restic
-# Reads configuration from /etc/openclaw/backup.yaml
+# Reads configuration from RESTIC_BACKUP_CONFIG_FILE (default: /etc/digitalocean/backup.yaml)
 
 set -e
 
-# Source s6 container environment (required for cron which doesn't inherit env)
-for f in /run/s6/container_environment/RESTIC_*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
+# Load RESTIC_ env vars
+for f in /run/s6/container_environment/RESTIC_/*; do
+  [ -f "$f" ] && export "$(basename "$f")"="$(cat "$f")"
 done
 
-CONFIG_FILE="/etc/openclaw/backup.yaml"
+CONFIG_FILE="${RESTIC_BACKUP_CONFIG_FILE:-/etc/digitalocean/backup.yaml}"
 QUIET=""
 
 # Parse arguments
@@ -35,19 +35,22 @@ if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
   exit 0
 fi
 
-
-# Ensure Spaces credentials are exported for restic S3 backend
-if [ -z "$RESTIC_SPACES_ACCESS_KEY_ID" ] || [ -z "$RESTIC_SPACES_SECRET_ACCESS_KEY" ]; then
-  log "ERROR: RESTIC_SPACES_ACCESS_KEY_ID or RESTIC_SPACES_SECRET_ACCESS_KEY not set"
+# AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are loaded from RESTIC_ prefix (set by 05-setup-restic)
+if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+  log "ERROR: AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY not set (check RESTIC_ env setup)"
   exit 1
 fi
-export AWS_ACCESS_KEY_ID="$RESTIC_SPACES_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$RESTIC_SPACES_SECRET_ACCESS_KEY"
 
 # Check if config exists
 if [ ! -f "$CONFIG_FILE" ]; then
   log "Config file not found: $CONFIG_FILE"
   exit 1
 fi
+
+# Save dpkg selections before backup (for restore-packages)
+DPKG_SELECTIONS="/etc/openclaw/dpkg-selections"
+mkdir -p "$(dirname "$DPKG_SELECTIONS")"
+dpkg --get-selections > "$DPKG_SELECTIONS" 2>/dev/null || true
 
 # Get number of paths to backup
 PATH_COUNT=$(yq -r '.paths | length' "$CONFIG_FILE")

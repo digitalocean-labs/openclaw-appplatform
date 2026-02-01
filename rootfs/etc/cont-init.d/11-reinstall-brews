@@ -2,6 +2,8 @@
 set -euo pipefail
 
 # Reinstall Brews for all users (only when persistence is enabled AND Homebrew is installed)
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix HOMEBREW_
 
 # Skip if Homebrew is not installed
 # Homebrew is optional in this image to reduce size (~1.5GB savings)

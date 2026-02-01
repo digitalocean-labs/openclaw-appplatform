@@ -1,0 +1,15 @@
+#!/command/with-contenv bash
+
+source /etc/s6-overlay/lib/env-utils.sh
+
+# Dump all env vars to container environment and set permissions
+s6-dumpenv -m 0600 "${ENV_BASE:-/run/s6/container_environment}"
+
+# Add STABLE_HOSTNAME as a global variable
+persist_env_global STABLE_HOSTNAME
+
+# Organize all by prefix into subdirectories
+persist_env_all_prefixes
+
+# Apply runtime permissions
+apply_permissions

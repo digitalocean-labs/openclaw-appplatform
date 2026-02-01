@@ -1,16 +1,20 @@
+# =============================================================================
+# WORK IN PROGRESS - GHCR container image deployment
+# This file is experimental. Use app.yaml (builds from source) for now.
+# =============================================================================
 name: openclaw
 region: tor # Available: nyc, ams, sfo, sgp, lon, fra, blr, syd, tor
 
 workers:
   - name: openclaw
-    dockerfile_path: /Dockerfile
-    source_dir: /
+    # Deploy from pre-built GHCR image (faster than building from source)
+    image:
+      registry_type: GHCR
+      registry: ghcr.io
+      repository: bikramkgupta/openclaw-appplatform
+      tag: latest
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-2gb # Minimum 2GB required - 1GB causes heap overflow
-    github:
-      branch: main
-      deploy_on_push: true
-      repo: digitalocean-labs/openclaw-appplatform
     envs:
       # ============================================================
       # REQUIRED
@@ -18,9 +22,6 @@ workers:
       - key: OPENCLAW_GATEWAY_TOKEN
         scope: RUN_TIME
         type: SECRET
-      - key: STABLE_HOSTNAME
-        scope: RUN_TIME
-        value: openclaw
 
       # ============================================================
       # FEATURE FLAGS
@@ -57,22 +58,31 @@ workers:
       - key: TS_AUTHKEY
         scope: RUN_TIME
         type: SECRET
+      - key: TS_HOSTNAME
+        scope: RUN_TIME
+        value: openclaw
+      - key: TS_USERSPACE
+        scope: RUN_TIME
+        value: "true"
+      - key: TS_SOCKET
+        scope: RUN_TIME
+        value: /tmp/tailscaled.sock
 
       # ============================================================
       # SPACES - Data Persistence
       # Set ENABLE_SPACES=true and configure your Spaces bucket
       # Create bucket: https://cloud.digitalocean.com/spaces
       # ============================================================
-      - key: RESTIC_SPACES_ACCESS_KEY_ID
+      - key: LITESTREAM_ACCESS_KEY_ID
         scope: RUN_TIME
         type: SECRET
-      - key: RESTIC_SPACES_SECRET_ACCESS_KEY
+      - key: LITESTREAM_SECRET_ACCESS_KEY
         scope: RUN_TIME
         type: SECRET
-      - key: RESTIC_SPACES_ENDPOINT
+      - key: SPACES_ENDPOINT
         scope: RUN_TIME
         value: tor1.digitaloceanspaces.com
-      - key: RESTIC_SPACES_BUCKET
+      - key: SPACES_BUCKET
         scope: RUN_TIME
         value: openclaw-backup
       - key: RESTIC_PASSWORD
