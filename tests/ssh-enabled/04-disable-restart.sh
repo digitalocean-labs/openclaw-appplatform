@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test: SSH disable and restart
-# Verifies SSH can be disabled via env var and service restart
+# Verifies SSH can be disabled via env var and container restart
 
 set -e
 
@@ -9,23 +9,30 @@ source "$(dirname "$0")/../lib.sh"
 
 echo "Testing SSH disable/restart (container: $CONTAINER)..."
 
-# Container should be running
+# Container should be running with SSH enabled
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
 
-# Wait for SSH to be ready (container just started)
+# Wait for SSH to be ready
 wait_for_service "$CONTAINER" "sshd" || exit 1
 echo "✓ SSH initially running"
 
-# Disable SSH by updating the s6 environment variable (prefix directory)
-docker exec "$CONTAINER" bash -c "echo 'false' > /run/s6/container_environment/SSH_/SSH_ENABLE"
-echo "✓ Set SSH_ENABLE=false"
+# Stop the container
+docker compose stop
+echo "✓ Container stopped"
 
-# Gracefully restart sshd service (sends SIGTERM, waits, then restarts)
-docker exec "$CONTAINER" /command/s6-svc -r /run/service/sshd
-sleep 2
-echo "✓ Restarted sshd service"
+# Disable SSH in .env
+sed -i 's/^SSH_ENABLE=true/SSH_ENABLE=false/' .env
+echo "✓ Set SSH_ENABLE=false in .env"
 
-# SSH should now be down (service exits when SSH_ENABLE=false)
+# Restart container with new environment
+docker compose up -d
+sleep 10
+echo "✓ Container restarted"
+
+# Container should be running
+docker exec "$CONTAINER" true || { echo "error: container not responsive after restart"; exit 1; }
+
+# SSH should now be down
 assert_service_down "$CONTAINER" "sshd" || exit 1
 echo "✓ SSH service is down after disable"
 
@@ -40,14 +47,15 @@ if docker exec "$CONTAINER" bash -c 'echo > /dev/tcp/127.0.0.1/22' 2>/dev/null; 
 fi
 echo "✓ Port 22 not listening"
 
-# Re-enable SSH
-docker exec "$CONTAINER" bash -c "echo 'true' > /run/s6/container_environment/SSH_/SSH_ENABLE"
-echo "✓ Set SSH_ENABLE=true"
+# Re-enable SSH in .env
+sed -i 's/^SSH_ENABLE=false/SSH_ENABLE=true/' .env
+echo "✓ Set SSH_ENABLE=true in .env"
 
-# Restart sshd service
-docker exec "$CONTAINER" /command/s6-svc -u /run/service/sshd
-sleep 2
-echo "✓ Started sshd service"
+# Restart container
+docker compose stop
+docker compose up -d
+sleep 10
+echo "✓ Container restarted"
 
 # SSH should be back up
 wait_for_service "$CONTAINER" "sshd" || exit 1
