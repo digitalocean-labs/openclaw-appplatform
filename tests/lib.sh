@@ -72,18 +72,18 @@ wait_for_container() {
     # Wait for s6 init to complete (crond service must be up - starts after all init scripts)
     echo "✓ Container is responsive (waiting for init to complete...)"
     local init_attempts=0
-    local max_init_attempts=60  # 60 * 3s = 180s max
+    local max_init_attempts=60  # 60 * 5s = 300s max
     while [ $init_attempts -lt $max_init_attempts ]; do
         # Check if crond service exists and is up (always enabled, starts after init)
         if docker exec "$container" /command/s6-svstat /run/service/crond 2>/dev/null | grep -q "^up"; then
             echo "✓ s6 init complete (crond up)"
             return 0
         fi
-        sleep 3
+        sleep 5
         init_attempts=$((init_attempts + 1))
-        echo "  Waiting for s6 init... ($((init_attempts * 3))s)"
-        # Show recent logs every 5 attempts
-        if [ $((init_attempts % 5)) -eq 0 ]; then
+        echo "  Waiting for s6 init... ($((init_attempts * 5))s)"
+        # Show recent logs every 10 attempts
+        if [ $((init_attempts % 10)) -eq 0 ]; then
             echo "  --- Recent container logs ---"
             docker logs --tail 3 "$container" 2>&1 | sed 's/^/  /'
         fi
