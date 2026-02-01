@@ -79,6 +79,7 @@ jobs:
         run: |
           if [ -z "$DO_SPACES_ACCESS_KEY_ID" ] || [ -z "$DO_SPACES_SECRET_ACCESS_KEY" ]; then
             echo "SKIP_PERSISTENCE=true" >> $GITHUB_OUTPUT
+            echo "BUCKET_NAME=" >> $GITHUB_OUTPUT
             echo "Skipping: DO_SPACES credentials not configured"
             exit 0
           fi
