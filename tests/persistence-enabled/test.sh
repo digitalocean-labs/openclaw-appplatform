@@ -63,7 +63,13 @@ echo "✓ Snapshot created ($SNAPSHOT_COUNT total)"
 restart_container "$CONTAINER"
 
 # Wait for init scripts to complete by waiting for backup service to be ready
-wait_for_service "$CONTAINER" "backup" || { echo "error: Backup service not ready after restart"; exit 1; }
+if ! wait_for_service "$CONTAINER" "backup"; then
+    echo "--- Debug: Container logs after failed restart ---"
+    docker logs "$CONTAINER" 2>&1 | tail -50
+    echo "---"
+    echo "error: Backup service not ready after restart"
+    exit 1
+fi
 
 # Verify test data was restored
 RESTORED_CONTENT=$(docker exec "$CONTAINER" cat "$TEST_FILE" 2>/dev/null || echo "")
