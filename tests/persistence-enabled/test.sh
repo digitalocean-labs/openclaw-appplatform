@@ -146,20 +146,20 @@ wait_for_backup_service() {
     local max_attempts=${2:-30}
     local attempt=1
 
-    echo "Waiting for backup service to initialize..."
+    echo "Waiting for backup service to start..."
 
     while [ $attempt -le $max_attempts ]; do
-        # Check if restic repository is initialized
-        if docker exec "$container" bash -c 'restic snapshots 2>/dev/null' | grep -q 'ID\|no snapshots'; then
-            echo "✓ Restic repository ready"
+        # Check if backup service is up via s6
+        if docker exec "$container" s6-svstat /run/service/backup 2>/dev/null | grep -q "^up"; then
+            echo "✓ Backup service running"
             return 0
         fi
         echo "  Attempt $attempt/$max_attempts..."
-        sleep 5
+        sleep 2
         attempt=$((attempt + 1))
     done
 
-    echo "error: Backup service did not initialize"
+    echo "error: Backup service did not start"
     return 1
 }
 
