@@ -162,6 +162,10 @@ jobs:
           echo "Testing configuration: ${{ matrix.config }}"
           bash -c 'source tests/lib.sh && switch_config ${{ matrix.config }}'
 
+          # Add s6-overlay debug settings for CI
+          echo "S6_BEHAVIOUR_IF_STAGE2_FAILS=0" >> .env
+          echo "S6_VERBOSITY=2" >> .env
+
           # Add CI-generated SSH key for SSH configs (for external SSH testing)
           if [ -n "$SSH_PUBLIC_KEY" ]; then
             echo "SSH_AUTHORIZED_USERS=$SSH_PUBLIC_KEY" >> .env
