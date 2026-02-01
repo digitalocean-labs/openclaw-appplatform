@@ -153,6 +153,12 @@ apply_permissions() {
     return 1
   fi
 
+  # Enable globstar for ** recursive matching, nullglob for empty matches
+  local orig_globstar orig_nullglob
+  orig_globstar=$(shopt -p globstar 2>/dev/null || echo "shopt -u globstar")
+  orig_nullglob=$(shopt -p nullglob 2>/dev/null || echo "shopt -u nullglob")
+  shopt -s globstar nullglob
+
   local count
   count=$(yq '.permissions | length' "$config")
 
@@ -209,4 +215,8 @@ apply_permissions() {
       fi
     fi
   done
+
+  # Restore original shell options
+  eval "$orig_globstar"
+  eval "$orig_nullglob"
 }

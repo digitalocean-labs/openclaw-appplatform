@@ -24,13 +24,13 @@ if [ "$SSH_DIR_PERMS" != "700" ]; then
 fi
 echo "✓ .ssh directory permissions correct (700)"
 
-# authorized_keys should have correct permissions (600 or 644 are acceptable)
+# authorized_keys should have correct permissions (600 per permissions.yaml)
 AUTH_KEYS_PERMS=$(docker exec "$CONTAINER" stat -c %a /home/ubuntu/.ssh/authorized_keys 2>/dev/null || echo "unknown")
-if [ "$AUTH_KEYS_PERMS" != "600" ] && [ "$AUTH_KEYS_PERMS" != "644" ]; then
-    echo "error: authorized_keys has wrong permissions: $AUTH_KEYS_PERMS (expected 600 or 644)"
+if [ "$AUTH_KEYS_PERMS" != "600" ]; then
+    echo "error: authorized_keys has wrong permissions: $AUTH_KEYS_PERMS (expected 600)"
     exit 1
 fi
-echo "✓ authorized_keys permissions correct ($AUTH_KEYS_PERMS)"
+echo "✓ authorized_keys permissions correct (600)"
 
 # authorized_keys should not be empty
 AUTH_KEYS_SIZE=$(docker exec "$CONTAINER" stat -c %s /home/ubuntu/.ssh/authorized_keys 2>/dev/null || echo "0")
