@@ -1,0 +1,4 @@
+#!/bin/bash
+echo "  To switch to openclaw user: sudo -i -u openclaw bash"
+echo "  OpenClaw CLI is available directly from this shell."
+echo ""

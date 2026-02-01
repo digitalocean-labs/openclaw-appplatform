@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Only show Tailscale info if enabled
+if [[ -f /run/s6/container_environment/TAILSCALE_ENABLE ]] && \
+   [[ "$(cat /run/s6/container_environment/TAILSCALE_ENABLE)" == "true" ]]; then
+
+  echo "  Tailscale"
+  echo "  ─────────────────────────────────────"
+
+  TS_IP=$(tailscale ip -4 2>/dev/null)
+  if [ -n "$TS_IP" ]; then
+    printf "  %-12s %s\n" "IP:" "$TS_IP"
+  fi
+
+  echo ""
+  tailscale serve status 2>/dev/null | sed 's/^/  /'
+  echo ""
+fi

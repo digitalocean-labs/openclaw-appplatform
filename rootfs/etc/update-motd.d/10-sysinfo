@@ -1,0 +1,10 @@
+#!/bin/bash
+echo ""
+echo "  System Information"
+echo "  ─────────────────────────────────────"
+printf "  %-12s %s\n" "Hostname:" "$(hostname)"
+printf "  %-12s %s\n" "Uptime:" "$(uptime -p | sed 's/up //')"
+printf "  %-12s %s\n" "Load:" "$(cat /proc/loadavg | cut -d' ' -f1-3)"
+printf "  %-12s %s / %s\n" "Memory:" "$(free -h | awk '/Mem:/ {print $3}')" "$(free -h | awk '/Mem:/ {print $2}')"
+printf "  %-12s %s / %s\n" "Disk:" "$(df -h / | awk 'NR==2 {print $3}')" "$(df -h / | awk 'NR==2 {print $2}')"
+echo ""

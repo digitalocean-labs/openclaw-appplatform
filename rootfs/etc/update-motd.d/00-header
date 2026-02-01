@@ -1,12 +1,11 @@
+#!/bin/bash
+cat << 'EOF'
    ___                    ____ _
   / _ \ _ __   ___ _ __  / ___| | __ ___      __
  | | | | '_ \ / _ \ '_ \| |   | |/ _` \ \ /\ / /
  | |_| | |_) |  __/ | | | |___| | (_| |\ V  V /
   \___/| .__/ \___|_| |_|\____|_|\__,_| \_/\_/
        |_|
-                                      
+
   OpenClaw App Platform Container
-
-To get a shell as the openclaw user, use `sudo -i -u openclaw bash`
-
-You can use `openclaw` cli directly from here.
+EOF
