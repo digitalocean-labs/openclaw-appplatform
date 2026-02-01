@@ -10,15 +10,56 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      configs: ${{ steps.list-configs.outputs.configs }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: List test configurations
+        id: list-configs
+        run: |
+          configs=$(ls -1 example_configs/*.env | xargs -n1 basename | sed 's/\.env$//' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "configs=$configs" >> $GITHUB_OUTPUT
+          echo "Found configurations: $configs"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t openclaw-test:latest .
+          docker save openclaw-test:latest -o /tmp/openclaw-test.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/openclaw-test.tar
+          retention-days: 1
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: ${{ fromJson(needs.build.outputs.configs) }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
 
-      - name: Create minimal .env for testing
+      - name: Load Docker image
+        run: docker load -i /tmp/openclaw-test.tar
+
+      - name: Copy test configuration
         run: |
           cat > .env << 'EOF'
           TAILSCALE_ENABLE=false
@@ -29,30 +70,42 @@ jobs:
           # Keep container running even if services fail (0=continue, 1=SIGTERM, 2=SIGKILL)
           S6_BEHAVIOUR_IF_STAGE2_FAILS=0
           EOF
+          echo "Testing configuration: ${{ matrix.config }}"
+          cp example_configs/${{ matrix.config }}.env .env
+          echo "--- Configuration contents ---"
+          cat .env
 
-      - name: Build and start container
-        run: make rebuild
-
-      - name: Wait for services
-        run: sleep 10
+      - name: Start container
+        run: |
+          docker compose up -d
+          sleep 10
 
       - name: Dump container status
         if: always()
-        run: docker ps -a --filter name=openclaw-test
+        run: docker ps -a --filter name=${{ matrix.config }}
 
       - name: Dump container logs
         if: always()
-        run: docker logs openclaw-test 2>&1 || true
+        run: docker logs ${{ matrix.config }} 2>&1 || true
 
       - name: Dump process list
         if: always()
-        run: docker exec openclaw-test ps aux || echo "Container not running"
+        run: docker exec ${{ matrix.config }} ps aux || echo "Container not running"
 
       - name: Verify container is running
         run: |
-          if ! docker ps --filter name=openclaw-test --filter status=running | grep -q openclaw-test; then
+          if ! docker ps --filter name=${{ matrix.config }} --filter status=running | grep -q ${{ matrix.config }}; then
             echo "error: Container is not running"
             exit 1
+          fi
+
+      - name: Run test script
+        run: |
+          if [ -x "tests/${{ matrix.config }}/test.sh" ]; then
+            echo "Running tests/${{ matrix.config }}/test.sh"
+            ./tests/${{ matrix.config }}/test.sh ${{ matrix.config }}
+          else
+            echo "No test script found for ${{ matrix.config }}, skipping"
           fi
 
       - name: Cleanup
