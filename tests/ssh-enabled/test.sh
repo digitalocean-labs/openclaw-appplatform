@@ -15,12 +15,8 @@ docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 
 # SSH should be running
 wait_for_process "$CONTAINER" "sshd" || { echo "error: sshd not running but SSH_ENABLE=true"; exit 1; }
 
-# SSH port should be listening (use netstat as fallback if ss not available)
-if docker exec "$CONTAINER" command -v ss >/dev/null 2>&1; then
-    docker exec "$CONTAINER" ss -tlnp | grep -q ":22 " || { echo "error: SSH not listening on port 22"; exit 1; }
-else
-    docker exec "$CONTAINER" netstat -tlnp 2>/dev/null | grep -q ":22 " || { echo "error: SSH not listening on port 22"; exit 1; }
-fi
+# SSH port should be listening (use bash /dev/tcp since ss/netstat may not be installed)
+docker exec "$CONTAINER" bash -c 'echo > /dev/tcp/127.0.0.1/22' 2>/dev/null || { echo "error: SSH not listening on port 22"; exit 1; }
 echo "✓ SSH listening on port 22"
 
 # Authorized keys should be set up
