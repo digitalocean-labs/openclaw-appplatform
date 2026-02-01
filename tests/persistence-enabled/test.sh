@@ -155,7 +155,7 @@ wait_for_backup_service() {
             return 0
         fi
         echo "  Attempt $attempt/$max_attempts..."
-        sleep 2
+        sleep 5
         attempt=$((attempt + 1))
     done
 
