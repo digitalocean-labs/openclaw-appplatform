@@ -64,8 +64,8 @@ restart_container "$CONTAINER"
 
 # Wait for init scripts to complete and dump logs for debugging
 sleep 15
-echo "--- Container logs after restart ---"
-docker logs "$CONTAINER" 2>&1 | grep -E "\[(setup-restic|restore-state)\]" || true
+echo "--- Container logs after restart (init scripts) ---"
+docker logs "$CONTAINER" 2>&1 | grep -E "cont-init:|restore-state|setup-restic" || true
 echo "--- End container logs ---"
 
 # Verify test data was restored
