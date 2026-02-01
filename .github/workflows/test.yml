@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       configs: ${{ steps.list-configs.outputs.configs }}
+      scenarios: ${{ steps.list-scenarios.outputs.scenarios }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,6 +23,22 @@ jobs:
           configs=$(ls -1 example_configs/*.env | xargs -n1 basename | sed 's/\.env$//' | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "configs=$configs" >> $GITHUB_OUTPUT
           echo "Found configs: $configs"
+
+      - name: List test scenarios
+        id: list-scenarios
+        run: |
+          matrix='{"include":['
+          first=true
+          for env in example_configs/*.env; do
+            config=$(basename "$env" .env)
+            for script in $(ls tests/$config/*.sh 2>/dev/null | sort); do
+              [ "$first" = true ] && first=false || matrix+=','
+              matrix+="{\"config\":\"$config\",\"script\":\"$(basename $script)\"}"
+            done
+          done
+          matrix+=']}'
+          echo "scenarios=$matrix" >> $GITHUB_OUTPUT
+          echo "Found scenarios: $matrix"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -45,13 +62,106 @@ jobs:
           path: /tmp/openclaw-test.tar
           retention-days: 1
 
-  test:
+  setup:
     needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         config: ${{ fromJson(needs.build.outputs.configs) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load -i /tmp/openclaw-test.tar
+
+      - name: Install s3cmd
+        if: matrix.config == 'persistence-enabled'
+        run: sudo apt-get update && sudo apt-get install -y s3cmd
+
+      - name: Create Spaces bucket for persistence test
+        if: matrix.config == 'persistence-enabled'
+        id: spaces-bucket
+        env:
+          DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
+          DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "$DO_SPACES_ACCESS_KEY_ID" ] || [ -z "$DO_SPACES_SECRET_ACCESS_KEY" ]; then
+            echo "Skipping: DO_SPACES credentials not configured"
+            exit 0
+          fi
+          BUCKET_NAME="openclaw-test-$(date +%s)-$$"
+          SPACES_REGION="sfo3"
+          SPACES_ENDPOINT="${SPACES_REGION}.digitaloceanspaces.com"
+
+          s3cmd --access_key="$DO_SPACES_ACCESS_KEY_ID" \
+                --secret_key="$DO_SPACES_SECRET_ACCESS_KEY" \
+                --host="$SPACES_ENDPOINT" \
+                --host-bucket="%(bucket)s.$SPACES_ENDPOINT" \
+                mb "s3://$BUCKET_NAME"
+
+          echo "BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "SPACES_ENDPOINT=$SPACES_ENDPOINT" >> $GITHUB_OUTPUT
+          echo "Created bucket: $BUCKET_NAME"
+
+      - name: Copy test configuration
+        env:
+          RESTIC_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
+          RESTIC_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
+          RESTIC_SPACES_ENDPOINT: ${{ steps.spaces-bucket.outputs.SPACES_ENDPOINT }}
+          RESTIC_SPACES_BUCKET: ${{ steps.spaces-bucket.outputs.BUCKET_NAME }}
+          RESTIC_PASSWORD: test-password-${{ github.run_id }}
+        run: |
+          echo "Setting up configuration: ${{ matrix.config }}"
+          bash -c 'source tests/lib.sh && switch_config ${{ matrix.config }}'
+
+      - name: Start container
+        run: |
+          docker compose up -d
+          sleep 10
+
+      - name: Verify container is running
+        run: |
+          if ! docker ps --filter name=${{ matrix.config }} --filter status=running | grep -q ${{ matrix.config }}; then
+            echo "error: Container is not running"
+            docker logs ${{ matrix.config }} 2>&1 || true
+            exit 1
+          fi
+          echo "Container ${{ matrix.config }} is ready"
+
+      - name: Cleanup Spaces bucket
+        if: always() && matrix.config == 'persistence-enabled' && steps.spaces-bucket.outputs.BUCKET_NAME != ''
+        env:
+          DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
+          DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
+          BUCKET_NAME: ${{ steps.spaces-bucket.outputs.BUCKET_NAME }}
+          SPACES_ENDPOINT: ${{ steps.spaces-bucket.outputs.SPACES_ENDPOINT }}
+        run: |
+          echo "Cleaning up Spaces bucket: $BUCKET_NAME"
+          s3cmd --access_key="$DO_SPACES_ACCESS_KEY_ID" \
+                --secret_key="$DO_SPACES_SECRET_ACCESS_KEY" \
+                --host="$SPACES_ENDPOINT" \
+                --host-bucket="%(bucket)s.$SPACES_ENDPOINT" \
+                rb --recursive "s3://$BUCKET_NAME" || true
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down || true
+
+  scenario:
+    needs: [build, setup]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.build.outputs.scenarios) }}
 
     steps:
       - name: Checkout repository
@@ -107,25 +217,11 @@ jobs:
         run: |
           echo "Testing configuration: ${{ matrix.config }}"
           bash -c 'source tests/lib.sh && switch_config ${{ matrix.config }}'
-          echo "--- Configuration contents ---"
-          cat .env
 
       - name: Start container
         run: |
           docker compose up -d
           sleep 10
-
-      - name: Dump container status
-        if: always()
-        run: docker ps -a --filter name=${{ matrix.config }}
-
-      - name: Dump container logs
-        if: always()
-        run: docker logs ${{ matrix.config }} 2>&1 || true
-
-      - name: Dump process list
-        if: always()
-        run: docker exec ${{ matrix.config }} ps aux || echo "Container not running"
 
       - name: Verify container is running
         run: |
@@ -134,40 +230,16 @@ jobs:
             exit 1
           fi
 
-      - name: Run test scripts
+      - name: Run ${{ matrix.script }}
         env:
           DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
           DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
         run: |
-          scripts=($(ls tests/${{ matrix.config }}/*.sh 2>/dev/null | sort))
-          total=${#scripts[@]}
-          current=0
-          failed=0
+          echo "Running tests/${{ matrix.config }}/${{ matrix.script }}"
+          ./tests/${{ matrix.config }}/${{ matrix.script }} ${{ matrix.config }}
 
-          echo "## Test Results: ${{ matrix.config }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Script | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
-
-          for script in "${scripts[@]}"; do
-            if [ -x "$script" ]; then
-              current=$((current + 1))
-              name=$(basename "$script")
-              echo "::group::[$current/$total] $name"
-              if "$script" ${{ matrix.config }}; then
-                echo "| $name | ✅ |" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "| $name | ❌ |" >> $GITHUB_STEP_SUMMARY
-                failed=1
-              fi
-              echo "::endgroup::"
-            fi
-          done
-
-          exit $failed
-
-      - name: Dump final container state
-        if: always()
+      - name: Dump container state on failure
+        if: failure()
         run: |
           echo "=== Container status ==="
           docker ps -a --filter name=${{ matrix.config }}
@@ -182,10 +254,7 @@ jobs:
             docker exec ${{ matrix.config }} /command/s6-svstat "/run/service/$svc" 2>/dev/null || echo "unknown"
           done
           echo ""
-          echo "=== Container environment ==="
-          docker exec ${{ matrix.config }} bash -c 'for f in /run/s6/container_environment/*; do [ -f "$f" ] && echo "$(basename $f)=$(cat $f)"; done' 2>/dev/null || echo "No environment"
-          echo ""
-          echo "=== Final container logs ==="
+          echo "=== Container logs ==="
           docker logs ${{ matrix.config }} 2>&1 || true
 
       - name: Cleanup Spaces bucket
