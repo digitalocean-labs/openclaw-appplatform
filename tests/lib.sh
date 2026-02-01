@@ -32,9 +32,9 @@ wait_for_container() {
         return 1
     fi
 
-    # Give s6 time to initialize services
-    echo "✓ Container is responsive"
-    sleep 10
+    # Give s6 time to complete init scripts (restore can take 30-60s for large home directories)
+    echo "✓ Container is responsive (waiting for init to complete...)"
+    sleep 45
     return 0
 }
 
