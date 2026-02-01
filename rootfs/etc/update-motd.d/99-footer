@@ -1,0 +1,14 @@
+#!/bin/bash
+source /etc/update-motd.d/lib.sh
+
+echo -e "  💡 ${CYAN}Tip:${NC} Switch to openclaw user: ${YELLOW}sudo -i -u openclaw bash${NC}"
+echo -e "  🦞 ${GREEN}openclaw${NC} CLI is available directly from this shell."
+echo ""
+echo -e "  ${DIM}─────────────────────────────────────${NC}"
+echo -e "  🦞 ${BLUE}https://docs.openclaw.ai/${NC}"
+echo -e "     ${DIM}↳ OpenClaw documentation${NC}"
+echo -e "  📚 ${BLUE}https://docs.digitalocean.com/products/app-platform${NC}"
+echo -e "     ${DIM}↳ App Platform documentation${NC}"
+echo -e "  📦 ${BLUE}https://github.com/digitalocean-labs/openclaw-appplatform${NC}"
+echo -e "     ${DIM}↳ This container's source code${NC}"
+echo ""

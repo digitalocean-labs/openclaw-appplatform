@@ -1,0 +1,31 @@
+#!/bin/bash
+source /etc/update-motd.d/lib.sh
+
+echo -e "  🦞 ${BOLD}OpenClaw${NC}"
+echo -e "  ${DIM}─────────────────────────────────────${NC}"
+
+HEALTH=$(openclaw health --json 2>/dev/null)
+if [ -n "$HEALTH" ]; then
+  OK=$(echo "$HEALTH" | jq -r '.ok')
+  if [ "$OK" = "true" ]; then
+    printf "  ${CYAN}%-12s${NC} ${GREEN}✓ healthy${NC}\n" "Status:"
+  else
+    printf "  ${CYAN}%-12s${NC} ${RED}✗ unhealthy${NC}\n" "Status:"
+  fi
+
+  # Show configured channels
+  CHANNELS=$(echo "$HEALTH" | jq -r '.channels | to_entries[] | select(.value.configured == true) | .key' 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
+  if [ -n "$CHANNELS" ]; then
+    printf "  ${CYAN}%-12s${NC} ${YELLOW}%s${NC}\n" "Channels:" "$CHANNELS"
+  else
+    printf "  ${CYAN}%-12s${NC} ${DIM}none configured${NC}\n" "Channels:"
+  fi
+
+  # Show agent count
+  AGENT_COUNT=$(echo "$HEALTH" | jq -r '.agents | length')
+  printf "  ${CYAN}%-12s${NC} %s\n" "Agents:" "$AGENT_COUNT"
+else
+  printf "  ${CYAN}%-12s${NC} ${RED}✗ not running${NC}\n" "Status:"
+fi
+
+echo ""

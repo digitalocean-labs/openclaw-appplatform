@@ -4,6 +4,15 @@
 
 This repository contains the Docker configuration and deployment templates for running [OpenClaw](https://github.com/openclaw/openclaw) on DigitalOcean App Platform with Tailscale networking.
 
+## Quick Start
+
+```bash
+cp .env.example .env           # Configure environment variables
+make rebuild                   # Build and start container
+make logs                      # Follow container logs
+make shell                     # Shell into running container
+```
+
 ## Key Files
 
 - `Dockerfile` - Builds image with Ubuntu Noble, s6-overlay, Tailscale, Restic, Homebrew, pnpm, and openclaw
@@ -19,12 +28,15 @@ This repository contains the Docker configuration and deployment templates for r
 The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) for process supervision:
 
 **Initialization scripts** (`rootfs/etc/cont-init.d/`):
+- `00-persist-env-vars` - Persists environment variables for s6
 - `00-setup-tailscale` - Configures Tailscale networking (if enabled)
 - `05-setup-restic` - Initializes Restic repository and exports environment variables
 - `06-restore-packages` - Restores dpkg package list from backup
 - `10-restore-state` - Restores application state from Restic snapshots
-- `15-reinstall-brews` - Reinstalls Homebrew packages from backup (if Homebrew installed)
-- `50-generate-config` - Builds openclaw.json from environment variables
+- `11-reinstall-brews` - Reinstalls Homebrew packages from backup (if Homebrew installed)
+- `12-ssh-import-ids` - Imports SSH keys from GitHub (if GITHUB_USERNAME set)
+- `20-setup-openclaw` - Builds openclaw.json from environment variables
+- `99999-apply-permissions` - Applies final file permissions
 
 **Services** (`rootfs/etc/services.d/`):
 - `tailscale/` - Tailscale daemon (if TAILSCALE_ENABLE=true)
@@ -39,7 +51,7 @@ Users can add custom init scripts (prefix with `30-` or higher) and custom servi
 
 ## Networking
 
-Tailscale is required for networking. The gateway binds to loopback and uses Tailscale serve mode for access via your tailnet.
+Tailscale is required for networking. The gateway binds to `127.0.0.1:18789` and uses Tailscale serve mode to expose port 443 on your tailnet.
 
 Required environment variables:
 - `TS_AUTHKEY` - Tailscale auth key
@@ -60,64 +72,42 @@ Set `GRADIENT_API_KEY` to enable DigitalOcean's serverless AI inference with mod
 
 ## Persistence
 
-Optional DO Spaces backup via [Restic](https://restic.net/):
+Optional DO Spaces backup via [Restic](https://restic.net/) when `ENABLE_SPACES=true`.
 
-**Backup System:**
-- Uses Restic for incremental, encrypted snapshots to DigitalOcean Spaces (S3-compatible)
-- Backup service runs continuously, creating snapshots every 30 seconds (configurable via `backup.yaml`)
-- Prune service runs hourly to remove old snapshots and optimize storage
-- Repository is automatically initialized on first run
+**How it works:**
 
-**What Gets Backed Up:**
-- `/etc` - System configuration
-- `/root` - Root user home directory
-- `/data/.openclaw` - OpenClaw state (config, sessions, agents, cron)
-- `/data/tailscale` - Tailscale connection state
-- `/home` - User home directories (includes Homebrew packages)
+- Incremental, encrypted snapshots to DigitalOcean Spaces (S3-compatible)
+- Backup runs every 30s; prune runs hourly
+- `10-restore-state` restores latest snapshots on container start
 
-**Restore on Startup:**
-- `10-restore-state` init script runs on container start
-- Restores latest snapshot for each path from Restic repository
-- Fixes file ownership (openclaw user) after restore
-- Skips restore if no snapshots found (first run)
+**What gets backed up:** `/etc`, `/root`, `/data/.openclaw`, `/data/tailscale`, `/home`
 
-**Configuration:**
-- Repository URL: `s3:<endpoint>/<bucket>/<hostname>/restic`
-- Backup paths and intervals defined in `/etc/digitalocean/backup.yaml`
-- Encrypted with `RESTIC_PASSWORD`
-- Access via Spaces credentials (`RESTIC_SPACES_ACCESS_KEY_ID`, `RESTIC_SPACES_SECRET_ACCESS_KEY`)
+**Required env vars:** `RESTIC_SPACES_ACCESS_KEY_ID`, `RESTIC_SPACES_SECRET_ACCESS_KEY`, `RESTIC_SPACES_ENDPOINT`, `RESTIC_SPACES_BUCKET`, `RESTIC_PASSWORD`
 
-## Customizing Backup Configuration
+**Customizing:** Edit `rootfs/etc/digitalocean/backup.yaml` to change intervals, paths, excludes, or retention policy.
 
-The backup system is configured via `/etc/digitalocean/backup.yaml`:
+## Testing
 
-```yaml
-# Repository location (S3-compatible, variables expanded at runtime)
-repository: "s3:${RESTIC_SPACES_ENDPOINT}/${RESTIC_SPACES_BUCKET}/${RESTIC_HOST}/restic"
+CI runs on push/PR to main via GitHub Actions (`.github/workflows/test.yml`):
 
-# Backup paths (order matters for restore)
-paths:
-  - path: /etc
-  - path: /data/.openclaw
-    exclude:
-      - "*.lock"
-      - "*.pid"
+- Builds the Docker image
+- Starts container with features disabled
+- Verifies container stays running
 
-# Intervals
-backup_interval_seconds: 30  # Backup frequency
-prune_interval_seconds: 3600 # Prune frequency (1 hour)
+Run locally with `make rebuild` to test changes before pushing.
 
-# Retention policy
-retention:
-  keep_last: 10      # Keep last 10 snapshots
-  keep_hourly: 48    # Keep 48 hourly snapshots
-  keep_daily: 30     # Keep 30 daily snapshots
-  keep_weekly: 8     # Keep 8 weekly snapshots
-  keep_monthly: 6    # Keep 6 monthly snapshots
-```
+## Gotchas
 
-To customize, add your own `rootfs/etc/digitalocean/backup.yaml` and rebuild the image.
+- **Use `openclaw` wrapper in console sessions** - The wrapper in `/usr/local/bin/openclaw` runs commands as the correct user with proper environment. Running the binary directly as root won't work.
+- **Service restarts**: Use `/command/s6-svc -r /run/service/<name>` to restart services (openclaw, ngrok, tailscale, etc.)
+- **See CHEATSHEET.md** for detailed command reference and troubleshooting
 
 ## Development
 
-It's a general rule, do not push code change and then trigger a deployment when trying to develop. It's always better to make the code changes inside the container and then restart the OpenClaw service. That way we can iterate really fast.
+Do not push code changes and then trigger a deployment when trying to develop. Make code changes inside the container and restart the OpenClaw service to iterate quickly:
+
+```bash
+make shell                                    # Enter container
+# Make your changes...
+/command/s6-svc -r /run/service/openclaw      # Restart service
+```

@@ -2,16 +2,16 @@
 
 ## The `openclaw` Command
 
-**IMPORTANT:** In console sessions, always use `openclaw` instead of `openclaw` directly.
+**IMPORTANT:** In console sessions, always use the `openclaw` wrapper command.
 
-The `openclaw` wrapper script runs openclaw commands as the correct user with proper environment. Without it, you'll get "command not found" errors when running as root.
+The `openclaw` wrapper script (in `/usr/local/bin/`) runs commands as the correct user with proper environment. Without it, you'll get "command not found" errors when running as root.
 
 ```bash
-# ✅ Correct - use openclaw
+# ✅ Correct - use the wrapper
 openclaw channels status --probe
 
-# ❌ Wrong - openclaw not in root's PATH
-openclaw channels status --probe
+# ❌ Wrong - running the binary directly won't work as root
+/home/openclaw/.local/bin/openclaw channels status --probe
 ```
 
 ---
@@ -21,6 +21,7 @@ openclaw channels status --probe
 ```bash
 doctl apps list                              # List apps, get app ID
 doctl apps console <app-id> openclaw          # Open console session
+motd                                         # Show system info (MOTD)
 ```
 
 ---
@@ -133,6 +134,9 @@ curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
 ## Quick Diagnostics
 
 ```bash
+# Show system info (MOTD)
+motd
+
 # Full system check
 openclaw gateway health --url ws://127.0.0.1:18789 && \
 openclaw channels status --probe && \
@@ -207,7 +211,7 @@ ss -tlnp | grep 18789
 curl -I http://127.0.0.1:18789
 
 # Re-run config generation
-/etc/cont-init.d/20-generate-config
+/etc/cont-init.d/20-setup-openclaw
 
 # Check service dependencies
 ls /etc/services.d/*/dependencies.d/

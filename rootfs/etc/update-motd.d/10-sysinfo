@@ -1,0 +1,47 @@
+#!/bin/bash
+source /etc/update-motd.d/lib.sh
+
+echo ""
+echo -e "  🖥️  ${BOLD}System${NC}"
+echo -e "  ${DIM}─────────────────────────────────────${NC}"
+
+printf "  ${CYAN}%-12s${NC} %s\n" "Hostname:" "$(hostname)"
+printf "  ${CYAN}%-12s${NC} %s\n" "Uptime:" "$(uptime -p | sed 's/up //')"
+
+# Load with color coding
+LOAD=$(cat /proc/loadavg | cut -d' ' -f1)
+CORES=$(nproc 2>/dev/null || echo 1)
+if (( $(echo "$LOAD > $CORES" | bc -l 2>/dev/null || echo 0) )); then
+  LOAD_COLOR="${RED}"
+elif (( $(echo "$LOAD > $CORES * 0.7" | bc -l 2>/dev/null || echo 0) )); then
+  LOAD_COLOR="${YELLOW}"
+else
+  LOAD_COLOR="${GREEN}"
+fi
+printf "  ${CYAN}%-12s${NC} ${LOAD_COLOR}%s${NC}\n" "Load:" "$(cat /proc/loadavg | cut -d' ' -f1-3)"
+
+# Memory with color coding
+MEM_USED=$(free | awk '/Mem:/ {print $3}')
+MEM_TOTAL=$(free | awk '/Mem:/ {print $2}')
+MEM_PCT=$((MEM_USED * 100 / MEM_TOTAL))
+if [ $MEM_PCT -gt 90 ]; then
+  MEM_COLOR="${RED}"
+elif [ $MEM_PCT -gt 70 ]; then
+  MEM_COLOR="${YELLOW}"
+else
+  MEM_COLOR="${GREEN}"
+fi
+printf "  ${CYAN}%-12s${NC} ${MEM_COLOR}%s / %s${NC} ${DIM}(%d%%)${NC}\n" "Memory:" "$(free -h | awk '/Mem:/ {print $3}')" "$(free -h | awk '/Mem:/ {print $2}')" "$MEM_PCT"
+
+# Disk with color coding
+DISK_PCT=$(df / | awk 'NR==2 {gsub(/%/,""); print $5}')
+if [ $DISK_PCT -gt 90 ]; then
+  DISK_COLOR="${RED}"
+elif [ $DISK_PCT -gt 70 ]; then
+  DISK_COLOR="${YELLOW}"
+else
+  DISK_COLOR="${GREEN}"
+fi
+printf "  ${CYAN}%-12s${NC} ${DISK_COLOR}%s / %s${NC} ${DIM}(%d%%)${NC}\n" "Disk:" "$(df -h / | awk 'NR==2 {print $3}')" "$(df -h / | awk 'NR==2 {print $2}')" "$DISK_PCT"
+
+echo ""

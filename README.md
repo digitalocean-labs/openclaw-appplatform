@@ -81,16 +81,16 @@ doctl apps list
 doctl apps console <app-id> openclaw
 
 # Verify gateway is running
-mb gateway health --url ws://127.0.0.1:18789
+openclaw gateway health --url ws://127.0.0.1:18789
 
 # Check channel status
-mb channels status --probe
+openclaw channels status --probe
 ```
 
 ### What's Included
 
 - ✅ OpenClaw gateway (WebSocket on port 18789)
-- ✅ CLI access via `mb` command
+- ✅ CLI access via `openclaw` command
 - ✅ All channel plugins (WhatsApp, Telegram, Discord, etc.)
 - ❌ No web UI access (use CLI/TUI)
 - ❌ No public URL
@@ -265,19 +265,19 @@ Want an AI assistant to help deploy and configure OpenClaw? See **[AI-ASSISTED-S
 
 ## CLI Cheat Sheet
 
-The `mb` command is a wrapper that runs openclaw with the correct user and environment. **Always use `mb` in console sessions.**
+The `openclaw` command is a wrapper that runs openclaw with the correct user and environment. **Always use `openclaw` in console sessions.**
 
 ```bash
 # Gateway
-mb gateway health --url ws://127.0.0.1:18789
-mb gateway status
+openclaw gateway health --url ws://127.0.0.1:18789
+openclaw gateway status
 
 # Channels
-mb channels status --probe
-mb channels login                    # WhatsApp QR code
+openclaw channels status --probe
+openclaw channels login                    # WhatsApp QR code
 
 # Messages
-mb message send --channel whatsapp --target "+1234567890" --message "Hello!"
+openclaw message send --channel whatsapp --target "+1234567890" --message "Hello!"
 
 # Services
 /command/s6-svc -r /run/service/openclaw    # Restart
@@ -348,6 +348,17 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 ## Customization (s6-overlay)
 
 The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) for process supervision.
+
+### Dynamic MOTD
+
+On login, you'll see a colorful status display. Run `motd` anytime to refresh.
+
+| Section | Info |
+|---------|------|
+| 🖥️ System | Hostname, uptime, load, memory, disk (color-coded) |
+| 🔗 Tailscale | Status, IP, relay, serve URL (if enabled) |
+| 🦞 OpenClaw | Health status, configured channels, agent count |
+| 📚 Links | OpenClaw docs, App Platform docs, source repo |
 
 ### Add Custom Init Scripts
 

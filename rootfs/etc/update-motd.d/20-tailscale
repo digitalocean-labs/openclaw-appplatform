@@ -1,0 +1,52 @@
+#!/bin/bash
+source /etc/update-motd.d/lib.sh
+
+# Only show Tailscale info if enabled
+TAILSCALE_ENABLE_FILE="/run/s6/container_environment/TAILSCALE_ENABLE"
+if [[ -f "$TAILSCALE_ENABLE_FILE" ]] && \
+   [[ "$(cat "$TAILSCALE_ENABLE_FILE")" == "true" ]]; then
+
+  echo -e "  🔗 ${BOLD}Tailscale${NC}"
+  echo -e "  ${DIM}─────────────────────────────────────${NC}"
+
+  # Get status JSON for health info
+  STATUS_JSON=$(tailscale status --json 2>/dev/null)
+  if [ -n "$STATUS_JSON" ]; then
+    STATE=$(echo "$STATUS_JSON" | jq -r '.BackendState // "Unknown"')
+    if [ "$STATE" = "Running" ]; then
+      printf "  ${CYAN}%-12s${NC} ${GREEN}✓ %s${NC}\n" "Status:" "$STATE"
+    else
+      printf "  ${CYAN}%-12s${NC} ${RED}✗ %s${NC}\n" "Status:" "$STATE"
+    fi
+
+    TS_IP=$(echo "$STATUS_JSON" | jq -r '.TailscaleIPs[0] // empty')
+    if [ -n "$TS_IP" ]; then
+      printf "  ${CYAN}%-12s${NC} ${GREEN}%s${NC} ${DIM}(tailnet)${NC}\n" "IP:" "$TS_IP"
+    fi
+
+    RELAY=$(echo "$STATUS_JSON" | jq -r '.Self.Relay // empty')
+    if [ -n "$RELAY" ]; then
+      printf "  ${CYAN}%-12s${NC} %s\n" "Relay:" "$RELAY"
+    fi
+  fi
+
+  # Parse serve status JSON
+  SERVE_JSON=$(tailscale serve status --json 2>/dev/null)
+  if [ -n "$SERVE_JSON" ] && [ "$SERVE_JSON" != "null" ]; then
+    HOSTNAME=$(echo "$SERVE_JSON" | jq -r '.Web | keys[0] // empty' 2>/dev/null | sed 's/:443$//')
+    if [ -n "$HOSTNAME" ]; then
+      printf "  ${CYAN}%-12s${NC} ${BLUE}https://%s${NC}\n" "URL:" "$HOSTNAME"
+      printf "  ${DIM}             ↳ public URL on your tailnet${NC}\n"
+    fi
+
+    # Show proxy targets
+    PROXY=$(echo "$SERVE_JSON" | jq -r '.Web | .[].Handlers | to_entries[] | "\(.key) → \(.value.Proxy // .value.Path // "static")"' 2>/dev/null)
+    if [ -n "$PROXY" ]; then
+      echo "$PROXY" | while read -r line; do
+        printf "  ${CYAN}%-12s${NC} ${YELLOW}%s${NC}\n" "Proxy:" "$line"
+      done
+    fi
+  fi
+
+  echo ""
+fi
