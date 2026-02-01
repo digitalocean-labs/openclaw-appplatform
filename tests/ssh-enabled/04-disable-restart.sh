@@ -12,8 +12,8 @@ echo "Testing SSH disable/restart (container: $CONTAINER)..."
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
 
-# SSH should currently be running
-assert_service_up "$CONTAINER" "sshd" || exit 1
+# Wait for SSH to be ready (container just started)
+wait_for_service "$CONTAINER" "sshd" || exit 1
 echo "✓ SSH initially running"
 
 # Disable SSH by updating the s6 environment variable
