@@ -6,9 +6,14 @@ set -e
 source_env_prefix OPENCLAW_
 
 # OpenClaw requires any env vars consumed in config to exist or else it fails to start.
-persist_env_var OPENCLAW_ GRADIENT_API_KEY=change-me \
-  TAILSCALE_ENABLE="${TAILSCALE_ENABLE:-false}"
-  HOME=/home/openclaw \
+persist_env_var OPENCLAW_ \
+  GRADIENT_API_KEY=change-me \
+  TAILSCALE_ENABLE="${TAILSCALE_ENABLE:-false}" \
+  TS_SOCKET="${TS_SOCKET}" \
+  TS_EXTRA_ARGS="${TS_EXTRA_ARGS}" \
+  TS_HOSTNAME="${TS_HOSTNAME}" \
+  TS_STATE_DIR="${TS_STATE_DIR}" \
+  TS_USERSPACE="${TS_USERSPACE}" \
   OPENCLAW_STATE_DIR=/data/.openclaw \
   OPENCLAW_WORKSPACE_DIR=/data/workspace
 
@@ -23,21 +28,31 @@ if [ "${ENABLE_NGROK:-false}" = "true" ] && [ "${TAILSCALE_ENABLE:-false}" = "tr
   echo "[generate-config] Defaulting to Tailscale (disable ENABLE_NGROK to silence this)."
 fi
 
+# Setup openclaw user's .profile (used by login shells, no interactive check)
+SOURCE_LINE="source /etc/s6-overlay/lib/env-utils.sh"
+PROFILE="/home/openclaw/.profile"
+# Create .profile if it doesn't exist
+touch "$PROFILE"
+chown openclaw:openclaw "$PROFILE"
+# Append environment setup if not already present
+if ! grep -qF "$SOURCE_LINE" "$PROFILE"; then
+    cat >> "$PROFILE" <<'EOF'
+# OpenClaw environment setup
+source /etc/s6-overlay/lib/env-utils.sh 2>/dev/null || true
+source_env_prefix OPENCLAW_ 2>/dev/null || true
 
-# Source openclaw profile for PATH setup (if exists)
-[ -f /home/openclaw/.profile ] && . /home/openclaw/.profile
-[ -f /home/openclaw/.bashrc ] && . /home/openclaw/.bashrc
+# nvm
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-# Load nvm (needed for openclaw command)
-export NVM_DIR="/home/openclaw/.nvm"
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  . "$NVM_DIR/nvm.sh"
-  echo "[generate-config] nvm loaded successfully"
-  # Persist PATH, HOME, NVM_DIR for service to use
-  persist_env_var OPENCLAW_ PATH="$PATH" HOME="$HOME" NVM_DIR="$NVM_DIR" NODE_ENV="$NODE_ENV"
-else
-  echo "[generate-config] ERROR: nvm.sh not found at $NVM_DIR/nvm.sh" >&2
-  exit 1
+# pnpm
+export PNPM_HOME="$HOME/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+EOF
+    echo "Appended environment setup to $PROFILE"
 fi
 
 DEFAULT_CONFIG="/etc/openclaw/openclaw.default.json"
@@ -99,4 +114,5 @@ echo "[generate-config] Final config:"
 jq '.' "$CONFIG_FILE"
 
 persist_env_var OPENCLAW_
+
 echo "[generate-config] Done generating config"

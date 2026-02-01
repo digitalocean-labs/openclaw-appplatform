@@ -4,8 +4,6 @@ set -euo pipefail
 cd "/home/$USER" 2>/dev/null || cd /tmp
 
 # shellcheck disable=SC1090
-[ -f ~/.profile ]      && source ~/.profile      || true
-[ -f ~/.bash_profile ] && source ~/.bash_profile || true
 [ -f ~/.bashrc ]       && source ~/.bashrc       || true
 
 BREW=""

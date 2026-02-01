@@ -8,6 +8,11 @@ repository: "s3:${RESTIC_SPACES_ENDPOINT}/${RESTIC_SPACES_BUCKET}/${RESTIC_HOST}
 # Order matters for restore: /etc is restored first after packages
 paths:
   - path: /etc
+    exclude:
+      - "cont-init.d"
+      - "services.d"
+      - "s6-overlay"
+
   - path: /root
     exclude:
       - "*.lock"

@@ -110,13 +110,10 @@ with_env_prefix() {
   [[ "$1" == "--" ]] && shift
 
   if [[ -n "$run_user" ]]; then
-    # Get user's home directory
-    local user_home
-    user_home=$(getent passwd "$run_user" | cut -d: -f6)
-    # Run with login shell to source user's profile
-    exec env -i PATH="$PATH" HOME="$user_home" /command/s6-envdir "$ENV_BASE/$prefix" /command/s6-setuidgid "$run_user" /bin/bash -l -c "$*"
+    # Use runuser for proper login shell, source env vars and user's bashrc inside the shell
+    exec runuser -l "$run_user" -c "source /etc/s6-overlay/lib/env-utils.sh && [[ -f ~/.bashrc ]] && source ~/.bashrc; source_env_prefix $prefix && $*" 2>&1
   else
-    exec env -i PATH="$PATH" /command/s6-envdir "$ENV_BASE/$prefix" "$@"
+    exec env -i PATH="$PATH" /command/s6-envdir "$ENV_BASE/$prefix" "$@" 2>&1
   fi
 }
 

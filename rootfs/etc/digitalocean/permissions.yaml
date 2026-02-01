@@ -17,32 +17,48 @@ permissions:
   - path: /etc/digitalocean/*
     mode: "0444"
 
+  # s6 container environment - base directory must be traversable
+  - path: /run/s6/container_environment
+    mode: "0755"
+
   # s6 container environment files - root only for sensitive data
   - path: /run/s6/container_environment/**/*
     user: root
     group: root
     mode: "0600"
 
-  # OPENCLAW_ env readable by openclaw service
-  - path: /run/s6/container_environment/OPENCLAW_/**
+  # OPENCLAW_ env directory and files readable by openclaw service
+  - path: /run/s6/container_environment/OPENCLAW_
+    user: openclaw
+    group: openclaw
+    mode: "0755"
+  - path: /run/s6/container_environment/OPENCLAW_/*
     user: openclaw
     group: openclaw
     mode: "0644"
 
-  # TS_ env files - root only (contains auth keys)
+  # TS_ env directory and files readable by root only
+  - path: /run/s6/container_environment/TS_
+    user: root
+    group: root
+    mode: "0750"
   - path: /run/s6/container_environment/TS_/*
     user: root
     group: root
-    mode: "0400"
+    mode: "0640"
 
   # OpenClaw state directory
   - path: /data/.openclaw
     user: openclaw
     group: openclaw
-    mode: "0750"
+    mode: "0700"
   - path: /data/.openclaw/**
     user: openclaw
     group: openclaw
+  - path: /data/.openclaw/openclaw.json
+    user: openclaw
+    group: openclaw
+    mode: "0600"
 
   # Tailscale state directory
   - path: /data/tailscale

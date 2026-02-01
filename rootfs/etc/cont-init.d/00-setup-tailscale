@@ -1,15 +1,15 @@
 #!/command/with-contenv bash
 # Setup Tailscale
 source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix TS_
 
 echo "[tailscale] Setting up Tailscale"
 
 if [ "${TAILSCALE_ENABLE:-false}" != "true" ]; then
+  persist_env_var TS_ TAILSCALE_ENABLE="false"
   echo "[tailscale] Disabled (set TAILSCALE_ENABLE=true to enable)"
   exit 0
 fi
-
-persist_env_prefix TS_
 
 # Persist TS_ vars with defaults
 persist_env_var TS_ \
@@ -17,18 +17,17 @@ persist_env_var TS_ \
   TS_SOCKET=/tmp/tailscaled.sock \
   TS_USERSPACE=true \
   TS_STATE_DIR=/data/tailscale \
+  TS_EXTRA_ARGS="--operator=openclaw --accept-dns=false" \
   TAILSCALE_ENABLE="${TAILSCALE_ENABLE:-false}"
 
 # Also persist any existing TS_ vars from environment
 persist_env_prefix TS_
 
+source_env_prefix TS_
 # Create state directory
-TS_STATE_DIR="${TS_STATE_DIR:-/data/tailscale}"
 if ! mkdir -p "$TS_STATE_DIR"; then
   echo "[tailscale] ERROR: Failed to create state directory: $TS_STATE_DIR" >&2
   exit 1
 fi
-
-# Permissions applied via /etc/digitalocean/permissions.yaml
 
 echo "[tailscale] Setup complete"

@@ -4,4 +4,19 @@
 # Example: openclaw channels login
 #          openclaw gateway health --url ws://127.0.0.1:18789
 
-exec su - openclaw -c "openclaw$(printf ' %q' "$@")"
+# Source environment utilities
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix OPENCLAW_
+
+# Run directly if already openclaw user, otherwise switch user
+if [ "$(id -un)" = "openclaw" ]; then
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+  export PNPM_HOME="$HOME/.local/share/pnpm"
+  export PATH="$PNPM_HOME:$PATH"
+  exec "$PNPM_HOME/openclaw" "$@"
+elif [ "$(id -u)" = "0" ]; then
+  exec su - openclaw -c "openclaw$(printf ' %q' "$@")"
+else
+  exec sudo -u openclaw bash -l -c "openclaw$(printf ' %q' "$@")"
+fi

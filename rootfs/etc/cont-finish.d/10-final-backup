@@ -2,5 +2,5 @@
 # Final backup on container shutdown
 
 echo "[final-backup] Container shutting down, saving state..."
-/usr/local/bin/restic-backup --quiet
+/usr/local/bin/restic-backup
 echo "[final-backup] Complete"
