@@ -62,8 +62,11 @@ echo "✓ Snapshot created ($SNAPSHOT_COUNT total)"
 # Restart container to test restore
 restart_container "$CONTAINER"
 
-# Wait for restore to complete (runs during init)
-sleep 10
+# Wait for init scripts to complete and dump logs for debugging
+sleep 15
+echo "--- Container logs after restart ---"
+docker logs "$CONTAINER" 2>&1 | grep -E "\[(setup-restic|restore-state)\]" || true
+echo "--- End container logs ---"
 
 # Verify test data was restored
 RESTORED_CONTENT=$(docker exec "$CONTAINER" cat "$TEST_FILE" 2>/dev/null || echo "")
