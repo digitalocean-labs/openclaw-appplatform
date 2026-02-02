@@ -320,7 +320,7 @@ jobs:
           DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
         run: |
           echo "Cleaning up DOCR registry: ${{ steps.run-test.outputs.registry_name }}"
-          doctl registry delete --force || echo "Registry already deleted or not found (404 is OK)"
+          doctl registries delete "${{ steps.run-test.outputs.registry_name }}" --force || echo "Registry already deleted or not found (404 is OK)"
 
       - name: Cleanup
         if: always()
