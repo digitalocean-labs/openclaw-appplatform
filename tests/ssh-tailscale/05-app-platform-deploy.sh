@@ -1,6 +1,7 @@
 #!/bin/bash
 # Test: App Platform deployment
 # Verifies the app can be deployed to DigitalOcean App Platform using doctl
+# Creates a DOCR registry, pushes the local image, and deploys from it
 
 set -e
 
@@ -9,6 +10,7 @@ source "$(dirname "$0")/../lib.sh"
 
 SPEC_FILE="$(dirname "$0")/app-ssh-local.spec.yaml"
 APP_ID=""
+REGISTRY_NAME=""
 
 echo "Testing App Platform deployment..."
 
@@ -35,25 +37,70 @@ if [ ! -f "$SPEC_FILE" ]; then
     exit 1
 fi
 
-# Generate unique app name
-APP_NAME="openclaw-ci-test-$(date +%s)-$$"
+# Generate unique names
+APP_NAME="openclaw-ci-$(date +%s)-$$"
+REGISTRY_NAME="octest$(date +%s)"
 echo "App name: $APP_NAME"
+echo "Registry name: $REGISTRY_NAME"
 
-# Get current branch for the deployment
-CURRENT_BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-main}}"
-echo "Using branch: $CURRENT_BRANCH"
+# Create DOCR registry with professional plan
+echo ""
+echo "Creating DOCR registry..."
+doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3 || {
+    echo "error: Failed to create registry"
+    exit 1
+}
+echo "✓ Created registry: $REGISTRY_NAME"
 
-# Convert YAML spec to JSON and modify it
+# Output registry name for cleanup step
+if [ -n "$GITHUB_OUTPUT" ]; then
+    echo "registry_name=$REGISTRY_NAME" >> "$GITHUB_OUTPUT"
+fi
+
+# Login to registry
+echo "Logging into registry..."
+doctl registry login || {
+    echo "error: Failed to login to registry"
+    exit 1
+}
+echo "✓ Logged into registry"
+
+# Tag and push local image to DOCR
+REGISTRY_HOST="registry.digitalocean.com"
+IMAGE_TAG="$REGISTRY_HOST/$REGISTRY_NAME/openclaw:latest"
+echo "Tagging image as $IMAGE_TAG..."
+docker tag openclaw-test:latest "$IMAGE_TAG" || {
+    echo "error: Failed to tag image"
+    exit 1
+}
+
+echo "Pushing image to DOCR..."
+docker push "$IMAGE_TAG" || {
+    echo "error: Failed to push image"
+    exit 1
+}
+echo "✓ Pushed image to DOCR"
+
+# Convert YAML spec to JSON and modify it to use DOCR image
+echo ""
 echo "Preparing app spec..."
 APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
     --arg name "$APP_NAME" \
-    --arg branch "$CURRENT_BRANCH" \
+    --arg registry "$REGISTRY_NAME" \
     --arg ts_authkey "$TS_AUTHKEY" \
     --arg gateway_token "${OPENCLAW_GATEWAY_TOKEN:-test-token-$$}" \
     '
     .name = $name |
     .workers[0].name = $name |
-    .workers[0].git.branch = $branch |
+    del(.workers[0].git) |
+    del(.workers[0].dockerfile_path) |
+    del(.workers[0].source_dir) |
+    .workers[0].image = {
+        "registry_type": "DOCR",
+        "registry": $registry,
+        "repository": "openclaw",
+        "tag": "latest"
+    } |
     .workers[0].envs = [
         .workers[0].envs[] |
         if .key == "TS_AUTHKEY" then .value = $ts_authkey

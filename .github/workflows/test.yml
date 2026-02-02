@@ -314,6 +314,14 @@ jobs:
           echo "Cleaning up App Platform app: ${{ steps.run-test.outputs.app_id }}"
           doctl apps delete "${{ steps.run-test.outputs.app_id }}" --force || echo "App already deleted or not found (404 is OK)"
 
+      - name: Cleanup DOCR registry
+        if: always() && steps.run-test.outputs.registry_name != ''
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        run: |
+          echo "Cleaning up DOCR registry: ${{ steps.run-test.outputs.registry_name }}"
+          doctl registry delete --force || echo "Registry already deleted or not found (404 is OK)"
+
       - name: Cleanup
         if: always()
         run: docker compose down || true
