@@ -83,6 +83,11 @@ APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
     ]
     ')
 
+echo ""
+echo "=== Final app spec ==="
+echo "$APP_SPEC" | jq '.workers[0].envs'
+echo "=== end spec ==="
+
 echo "Creating app on App Platform (waiting for deployment)..."
 CREATE_OUTPUT=$(doctl apps create --spec - --wait -o json <<EOF
 $APP_SPEC
@@ -116,9 +121,19 @@ COMPONENT_NAME=$(echo "$APP_JSON" | jq -r '.[0].spec.workers[0].name // empty')
 [ -z "$COMPONENT_NAME" ] && COMPONENT_NAME="$APP_NAME"
 echo "Component: $COMPONENT_NAME"
 
+# Wait for container to be fully ready
+echo ""
+echo "Waiting 30s for container to stabilize..."
+sleep 30
+
 # Test app via console - verify SSH is working
 echo ""
 echo "Testing app via console..."
+
+# Debug: dump env and service status
+echo "=== Debug: env vars and services ==="
+echo "env | grep SSH && /command/s6-svstat /run/service/sshd" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r' || echo "Debug command failed"
+echo "=== end debug ==="
 
 # First, figure out who we are
 echo "Checking current user..."
@@ -133,6 +148,9 @@ echo "Checking if sshd is running..."
 SSHD_CHECK=$(echo "pgrep -x sshd >/dev/null && echo SSHD_RUNNING || echo SSHD_NOT_RUNNING" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r' | tail -1) || true
 if [ "$SSHD_CHECK" != "SSHD_RUNNING" ]; then
     echo "error: sshd is not running"
+    echo "=== Debug: all processes ==="
+    echo "ps aux" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r' || echo "ps failed"
+    echo "=== end debug ==="
     exit 1
 fi
 echo "✓ sshd is running"
