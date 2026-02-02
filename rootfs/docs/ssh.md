@@ -21,9 +21,11 @@ flowchart TD
         G --> R
         U --> K1[id_ed25519.pub]
         R --> K2[id_ed25519.pub]
-        K1 --> E[/etc/ssh/authorized_keys]
-        K2 --> E
-        B --> C[00-openclaw.conf]
+        K1 --> E1[~ubuntu/.ssh/authorized_keys]
+        K2 --> E1
+        K1 --> E2[~root/.ssh/authorized_keys]
+        K2 --> E2
+        B --> C[00-localssh.conf]
         B --> D[local-access.conf]
     end
 
@@ -46,26 +48,17 @@ flowchart TD
 
 ## Configuration Files
 
-### `/etc/ssh/sshd_config.d/00-openclaw.conf`
+### `/etc/ssh/sshd_config.d/00-localssh.conf`
 
 Base SSH configuration (managed by `13-setup-ssh-local`):
 
-**When SSH_ALLOW_LOCAL=true:**
-```
-PermitRootLogin no
-PasswordAuthentication no
-PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys /etc/ssh/authorized_keys
-UsePAM yes
-```
-
-**When SSH_ALLOW_LOCAL=false:**
 ```
 PermitRootLogin no
 PasswordAuthentication no
 PubkeyAuthentication yes
 AuthorizedKeysFile .ssh/authorized_keys
 UsePAM yes
+AcceptEnv MOTD_SKIP
 ```
 
 ### `/etc/ssh/sshd_config.d/local-access.conf`
@@ -76,10 +69,6 @@ Allows root login from localhost only (created when SSH_ALLOW_LOCAL=true):
 Match Address 127.0.0.1,::1
     PermitRootLogin yes
 ```
-
-### `/etc/ssh/authorized_keys`
-
-System-wide authorized keys file. When SSH_ALLOW_LOCAL=true, contains ubuntu user's public key, allowing ubuntu to SSH to any user.
 
 ## Init Scripts
 
@@ -103,14 +92,13 @@ flowchart TD
     C -->|true| D[Create localaccess group]
     D --> E[Add ubuntu + root to group]
     E --> F[Generate keypairs for all members]
-    F --> G[Write all pubkeys to /etc/ssh/authorized_keys]
+    F --> G[Write all pubkeys to each user's authorized_keys]
     G --> H[Configure sshd]
 ```
 
 **Cleanup** removes:
-- `/etc/ssh/authorized_keys`
+- Local access keys from each user's `~/.ssh/authorized_keys`
 - `/etc/ssh/sshd_config.d/local-access.conf`
-- Restores `00-openclaw.conf` to default
 
 ## The localaccess Group
 
@@ -131,7 +119,7 @@ SSH keypairs for all `localaccess` group members are rotated:
 The rotation script (`/usr/local/bin/ssh-rotate-local-key`):
 1. Iterates through all `localaccess` group members
 2. Generates new ed25519 keypair for each user
-3. Aggregates all public keys into `/etc/ssh/authorized_keys`
+3. Writes all public keys to each user's `~/.ssh/authorized_keys` (with markers)
 
 ## Usage Examples
 
@@ -180,7 +168,7 @@ Check that:
 2. `SSH_ALLOW_LOCAL=true` is set (for local access)
 3. sshd service is running: `/command/s6-svok /run/service/sshd`
 4. Keys exist: `ls -la /home/ubuntu/.ssh/`
-5. System authorized_keys exists: `cat /etc/ssh/authorized_keys`
+5. Local access keys are present: `grep "LOCAL ACCESS" ~/.ssh/authorized_keys`
 
 ### Service Not Starting
 
@@ -198,7 +186,7 @@ Check that:
 Verify config files exist and have correct content:
 
 ```bash
-cat /etc/ssh/sshd_config.d/00-openclaw.conf
+cat /etc/ssh/sshd_config.d/00-localssh.conf
 cat /etc/ssh/sshd_config.d/local-access.conf
 ```
 
@@ -214,9 +202,9 @@ Restart sshd after config changes:
 | `/etc/cont-init.d/12-ssh-import-ids` | Import keys from GitHub/env |
 | `/etc/cont-init.d/13-setup-ssh-local` | Configure local SSH access |
 | `/etc/services.d/sshd/run` | sshd service script |
-| `/etc/ssh/sshd_config.d/00-openclaw.conf` | Base SSH config |
+| `/etc/ssh/sshd_config.d/00-localssh.conf` | Base SSH config |
 | `/etc/ssh/sshd_config.d/local-access.conf` | Local root access config |
-| `/etc/ssh/authorized_keys` | System-wide authorized keys |
 | `/etc/cron.d/ssh-rotate-local-key` | Daily key rotation |
 | `/usr/local/bin/ssh-rotate-local-key` | Key rotation script |
-| `/home/ubuntu/.ssh/` | Ubuntu user's SSH keys |
+| `/home/ubuntu/.ssh/authorized_keys` | Ubuntu's authorized keys (external + local) |
+| `/root/.ssh/authorized_keys` | Root's authorized keys (local access) |

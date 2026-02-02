@@ -355,8 +355,8 @@ ssh openclaw@localhost  # Access openclaw user
 ```
 
 **How it works:**
-- A fresh SSH keypair is generated for `ubuntu` on each boot (rotated daily via cron)
-- The public key is added to `/etc/ssh/authorized_keys` (system-wide)
+- Fresh SSH keypairs are generated for `ubuntu` and `root` on each boot (rotated daily via cron)
+- All public keys are written to each user's `~/.ssh/authorized_keys`
 - Root login is allowed only from localhost
 
 ---
