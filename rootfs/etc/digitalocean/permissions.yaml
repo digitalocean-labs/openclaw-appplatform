@@ -179,10 +179,6 @@ permissions:
     user: root
     group: root
     mode: "0644"
-  - path: /etc/ssh/authorized_keys
-    user: root
-    group: root
-    mode: "0644"
 
   # All .ssh directories and keys (ownership inherited from parent)
   - path: /**/.ssh

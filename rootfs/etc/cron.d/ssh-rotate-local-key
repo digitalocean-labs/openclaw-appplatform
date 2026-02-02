@@ -1,2 +1,2 @@
-# Rotate local SSH key daily (SSH_ALLOW_LOCAL feature)
-0 0 * * * root /usr/local/bin/ssh-rotate-local-key && cat /home/ubuntu/.ssh/id_ed25519.pub > /etc/ssh/authorized_keys
+# Rotate local SSH keys daily (SSH_ALLOW_LOCAL feature)
+0 0 * * * root /usr/local/bin/ssh-rotate-local-key

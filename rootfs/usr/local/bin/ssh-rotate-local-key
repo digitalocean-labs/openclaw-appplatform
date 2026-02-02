@@ -1,11 +1,13 @@
 #!/bin/bash
 # Rotate local SSH keys for all members of the localaccess group
 # Keys are used for localhost SSH access between users
+# All public keys are written to each user's ~/.ssh/authorized_keys
 # Permissions are set via permissions.yaml
 
 set -e
 
 GROUP="localaccess"
+PUBKEYS=""
 
 # Ensure group exists
 getent group "$GROUP" >/dev/null || {
@@ -21,9 +23,7 @@ if [ -z "$MEMBERS" ]; then
   exit 0
 fi
 
-# Clear and recreate system-wide authorized_keys
-> /etc/ssh/authorized_keys
-
+# First pass: generate keys for each member and collect public keys
 for user in $MEMBERS; do
   # Get user's home directory
   HOME_DIR=$(getent passwd "$user" | cut -d: -f6)
@@ -47,10 +47,39 @@ for user in $MEMBERS; do
   # Set ownership
   chown -R "$user:$user" "$SSH_DIR"
 
-  # Add public key to system-wide authorized_keys
-  cat "$KEY_FILE.pub" >> /etc/ssh/authorized_keys
+  # Collect public key
+  PUBKEYS="$PUBKEYS$(cat "$KEY_FILE.pub")"$'\n'
 
   echo "[ssh-rotate] Generated SSH keypair for $user"
 done
 
-echo "[ssh-rotate] Updated /etc/ssh/authorized_keys with ${#MEMBERS[@]} keys"
+# Second pass: write all public keys to each user's authorized_keys
+for user in $MEMBERS; do
+  HOME_DIR=$(getent passwd "$user" | cut -d: -f6)
+  if [ -z "$HOME_DIR" ]; then
+    continue
+  fi
+
+  AUTH_KEYS="$HOME_DIR/.ssh/authorized_keys"
+
+  # Write all local access public keys (preserving any existing external keys)
+  # Use marker comments to identify local access keys
+  if [ -f "$AUTH_KEYS" ]; then
+    # Remove old local access keys (between markers)
+    sed -i '/^# BEGIN LOCAL ACCESS KEYS$/,/^# END LOCAL ACCESS KEYS$/d' "$AUTH_KEYS"
+  fi
+
+  # Append local access keys with markers
+  {
+    echo "# BEGIN LOCAL ACCESS KEYS"
+    echo -n "$PUBKEYS"
+    echo "# END LOCAL ACCESS KEYS"
+  } >> "$AUTH_KEYS"
+
+  chown "$user:$user" "$AUTH_KEYS"
+  chmod 600 "$AUTH_KEYS"
+
+  echo "[ssh-rotate] Updated authorized_keys for $user"
+done
+
+echo "[ssh-rotate] All localaccess members can now SSH to each other"

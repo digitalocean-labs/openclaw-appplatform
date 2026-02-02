@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test: SSH configuration verification
-# Verifies localaccess group, system authorized_keys, keypairs, and config files
+# Verifies localaccess group, user authorized_keys, keypairs, and config files
 
 set -e
 
@@ -17,10 +17,15 @@ docker exec "$CONTAINER" getent group localaccess || { echo "error: localaccess 
 MEMBERS=$(docker exec "$CONTAINER" getent group localaccess | cut -d: -f4)
 echo "✓ localaccess group exists with members: $MEMBERS"
 
-# Check system-wide authorized_keys exists and has keys
-docker exec "$CONTAINER" test -f /etc/ssh/authorized_keys || { echo "error: /etc/ssh/authorized_keys not found"; exit 1; }
-KEY_COUNT=$(docker exec "$CONTAINER" wc -l /etc/ssh/authorized_keys | awk '{print $1}')
-echo "✓ /etc/ssh/authorized_keys exists with $KEY_COUNT keys"
+# Check ubuntu authorized_keys contains local access keys
+docker exec "$CONTAINER" test -f /home/ubuntu/.ssh/authorized_keys || { echo "error: ubuntu authorized_keys not found"; exit 1; }
+docker exec "$CONTAINER" grep -q "BEGIN LOCAL ACCESS KEYS" /home/ubuntu/.ssh/authorized_keys || { echo "error: local access keys not found in ubuntu authorized_keys"; exit 1; }
+echo "✓ ubuntu authorized_keys contains local access keys"
+
+# Check root authorized_keys contains local access keys
+docker exec "$CONTAINER" test -f /root/.ssh/authorized_keys || { echo "error: root authorized_keys not found"; exit 1; }
+docker exec "$CONTAINER" grep -q "BEGIN LOCAL ACCESS KEYS" /root/.ssh/authorized_keys || { echo "error: local access keys not found in root authorized_keys"; exit 1; }
+echo "✓ root authorized_keys contains local access keys"
 
 # Check SSH keypairs exist for ubuntu
 docker exec "$CONTAINER" test -f /home/ubuntu/.ssh/id_ed25519 || { echo "error: ubuntu SSH key not found"; exit 1; }

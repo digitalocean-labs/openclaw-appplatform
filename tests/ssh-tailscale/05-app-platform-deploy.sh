@@ -52,6 +52,17 @@ IMAGE_TAG_ONLY=$(echo "$IMAGE_TAG" | cut -d':' -f2)
 echo "Registry: $IMAGE_REGISTRY, Repo: $IMAGE_REPO, Tag: $IMAGE_TAG_ONLY"
 
 # Convert YAML spec to JSON and modify it to use DOCR image
+# Get CI SSH public key for authorized_keys
+CI_SSH_PUBKEY="${CI_SSH_PUBKEY:-}"
+if [ -z "$CI_SSH_PUBKEY" ] && [ -f "$HOME/.ssh/id_ed25519_test.pub" ]; then
+    CI_SSH_PUBKEY=$(cat "$HOME/.ssh/id_ed25519_test.pub")
+fi
+if [ -z "$CI_SSH_PUBKEY" ]; then
+    echo "error: CI_SSH_PUBKEY not set and no test key found"
+    exit 1
+fi
+echo "CI SSH public key: ${CI_SSH_PUBKEY:0:50}..."
+
 echo ""
 echo "Preparing app spec..."
 APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
@@ -61,6 +72,7 @@ APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
     --arg tag "$IMAGE_TAG_ONLY" \
     --arg ts_authkey "$TS_AUTHKEY" \
     --arg gateway_token "${OPENCLAW_GATEWAY_TOKEN:-test-token-$$}" \
+    --arg ssh_pubkey "$CI_SSH_PUBKEY" \
     '
     .name = $name |
     .workers[0].name = $name |
@@ -73,14 +85,14 @@ APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
         "repository": $repo,
         "tag": $tag
     } |
-    .workers[0].envs = [
+    .workers[0].envs = ([
         .workers[0].envs[] |
         if .key == "TS_AUTHKEY" then .value = $ts_authkey
         elif .key == "OPENCLAW_GATEWAY_TOKEN" then .value = $gateway_token
         elif .key == "STABLE_HOSTNAME" then .value = $name
         else .
         end
-    ]
+    ] + [{"key": "SSH_AUTHORIZED_USERS", "scope": "RUN_TIME", "value": $ssh_pubkey}])
     ')
 
 echo ""

@@ -7,14 +7,12 @@
 # When enabled:
 #   - Creates 'localaccess' group with ubuntu and root as members
 #   - Generates fresh SSH keypairs for all group members (rotated on boot, daily via cron)
-#   - Writes all public keys to /etc/ssh/authorized_keys (system-wide)
-#   - Configures sshd to accept system-wide authorized_keys for all users
+#   - Writes all public keys to each user's ~/.ssh/authorized_keys
 #   - Allows root login from localhost only (Match block)
 #
 # When disabled (cleanup):
-#   - Removes /etc/ssh/authorized_keys
-#   - Removes local-access.conf
-#   - Restores 00-localssh.conf to default
+#   - Removes local access keys from ~/.ssh/authorized_keys
+#   - Removes local-access.conf (Match block for localhost root login)
 
 source /etc/s6-overlay/lib/env-utils.sh
 source_env_prefix SSH_
@@ -24,32 +22,17 @@ GROUP="localaccess"
 cleanup() {
   persist_env_var PUBLIC PUBLIC_SSH_LOCALACCESS=false
 
-  rm -f /etc/ssh/authorized_keys
   rm -f /etc/ssh/sshd_config.d/local-access.conf
   rm -f /etc/ssh/ssh_config.d/00-localssh.conf
-  # Restore default sshd config (without system-wide authorized_keys)
-  cat > /etc/ssh/sshd_config.d/00-localssh.conf << 'EOF'
-# OpenClaw SSH configuration
 
-# Disable root login via SSH
-PermitRootLogin no
+  # Remove local access keys from user authorized_keys files
+  for user in ubuntu root; do
+    HOME_DIR=$(getent passwd "$user" | cut -d: -f6)
+    if [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/.ssh/authorized_keys" ]; then
+      sed -i '/^# BEGIN LOCAL ACCESS KEYS$/,/^# END LOCAL ACCESS KEYS$/d' "$HOME_DIR/.ssh/authorized_keys"
+    fi
+  done
 
-# Disable password authentication - key only
-PasswordAuthentication no
-PermitEmptyPasswords no
-ChallengeResponseAuthentication no
-KbdInteractiveAuthentication no
-
-# Enable public key authentication
-PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys
-
-# Use PAM for authentication
-UsePAM yes
-
-# Accept MOTD_SKIP to prevent MOTD recursion from openclaw wrapper
-AcceptEnv MOTD_SKIP
-EOF
   echo "[ssh-local] Cleanup complete"
 }
 
@@ -93,7 +76,7 @@ mkdir -p /home/ubuntu/.ssh
 # Configure sshd for local access
 mkdir -p /etc/ssh/sshd_config.d
 
-# Update base config to include system-wide authorized_keys
+# Configure sshd (local access keys are in each user's authorized_keys)
 cat > /etc/ssh/sshd_config.d/00-localssh.conf << 'EOF'
 # OpenClaw SSH configuration
 
@@ -108,7 +91,7 @@ KbdInteractiveAuthentication no
 
 # Enable public key authentication
 PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys /etc/ssh/authorized_keys
+AuthorizedKeysFile .ssh/authorized_keys
 
 # Use PAM for authentication
 UsePAM yes
