@@ -123,7 +123,10 @@ APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
     ')
 
 echo "Creating app on App Platform..."
-CREATE_OUTPUT=$(echo "$APP_SPEC" | doctl apps create --spec - -o json --wait 2>&1) || {
+CREATE_OUTPUT=$(doctl apps create --spec - -o json --wait << EOF
+$APP_SPEC
+EOF
+) || {
     echo "error: Failed to create app"
     echo "$CREATE_OUTPUT"
     exit 1
