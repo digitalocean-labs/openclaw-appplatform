@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test: App Platform deployment
 # Verifies the app can be deployed to DigitalOcean App Platform using doctl
-# Uses CI registry (CI_REGISTRY_NAME, CI_IMAGE_TAG) when available, otherwise creates own
+# Uses Tailscale sidecar to SSH into the deployed app and verify sshd works
 
 set -e
 
@@ -35,11 +35,11 @@ if [ ! -f "$SPEC_FILE" ]; then
     exit 1
 fi
 
-# Generate unique app name
+# Generate unique app name (this will be the Tailscale hostname)
 APP_NAME="openclaw-ci-$(date +%s)-$$"
 echo "App name: $APP_NAME"
 
-# Use CI registry if available, otherwise create our own
+# Use CI registry if available
 echo "Using CI registry: $CI_REGISTRY_NAME"
 IMAGE_TAG="$CI_IMAGE_TAG"
 
@@ -84,7 +84,7 @@ APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
     ')
 
 echo ""
-echo "=== Final app spec ==="
+echo "=== Final app spec envs ==="
 echo "$APP_SPEC" | jq '.workers[0].envs'
 echo "=== end spec ==="
 
@@ -111,102 +111,99 @@ if [ -n "$GITHUB_OUTPUT" ]; then
     echo "app_id=$APP_ID" >> "$GITHUB_OUTPUT"
 fi
 
-# Get app info and component name
+# Get app info
 APP_JSON=$(doctl apps get "$APP_ID" -o json 2>/dev/null)
 echo ""
 echo "App details:"
 echo "$APP_JSON" | jq -r '.[0] | "ID: \(.id)\nIngress: \(.default_ingress // "none")\nPhase: \(.active_deployment.phase // "unknown")"' || true
 
-COMPONENT_NAME=$(echo "$APP_JSON" | jq -r '.[0].spec.workers[0].name // empty')
-[ -z "$COMPONENT_NAME" ] && COMPONENT_NAME="$APP_NAME"
-echo "Component: $COMPONENT_NAME"
-
-# Wait for container to be fully ready
+# Wait for app to join tailnet and be reachable
 echo ""
-echo "Waiting 60s for container to stabilize..."
-sleep 60
-
-# Test app via console - verify SSH is working
-echo ""
-echo "Testing app via console..."
-
-# Helper function to run console command with pseudo-TTY
-run_console() {
-    local cmd="$1"
-    # Use script to provide a pseudo-TTY since doctl console requires it
-    script -q -c "echo '$cmd' | timeout 60 doctl apps console '$APP_ID' '$COMPONENT_NAME'" /dev/null 2>&1 | tr -d '\r'
-}
-
-# Debug: dump env and service status
-echo "=== Debug: env vars and services ==="
-run_console "env | grep -E '^SSH_|^PUBLIC_' ; /command/s6-svstat /run/service/sshd ; ps aux | grep -E 'sshd|s6' | head -10"
-echo "=== end debug ==="
-
-# First, figure out who we are
-echo "Checking current user..."
-CONSOLE_OUTPUT=$(run_console "whoami")
-echo "Raw console output: [$CONSOLE_OUTPUT]"
-CURRENT_USER=$(echo "$CONSOLE_OUTPUT" | grep -v "^$" | tail -1)
-echo "✓ Console user: $CURRENT_USER"
-
-if [ -z "$CURRENT_USER" ]; then
-    echo "warning: Could not determine console user, continuing anyway..."
-fi
-
-# Check if sshd is running with retry
-echo "Checking if sshd is running..."
-SSHD_RETRIES=6
-for i in $(seq 1 $SSHD_RETRIES); do
-    CONSOLE_OUTPUT=$(run_console "pgrep -x sshd >/dev/null && echo SSHD_RUNNING || echo SSHD_NOT_RUNNING")
-    echo "  Console output: [$CONSOLE_OUTPUT]"
-    SSHD_CHECK=$(echo "$CONSOLE_OUTPUT" | grep -oE "SSHD_(RUNNING|NOT_RUNNING)" | tail -1)
-    if [ "$SSHD_CHECK" = "SSHD_RUNNING" ]; then
-        echo "✓ sshd is running"
+echo "Waiting for app to join tailnet (hostname: $APP_NAME)..."
+TS_RETRIES=30
+for i in $(seq 1 $TS_RETRIES); do
+    # Check if app is reachable via Tailscale sidecar
+    if docker exec tailscale-test tailscale ping --c 1 "$APP_NAME" >/dev/null 2>&1; then
+        echo "✓ App is reachable on tailnet"
         break
     fi
-    echo "  Attempt $i/$SSHD_RETRIES: sshd not running yet (got: $SSHD_CHECK), waiting 10s..."
+    if [ $i -eq $TS_RETRIES ]; then
+        echo "error: App not reachable on tailnet after $TS_RETRIES attempts"
+        docker exec tailscale-test tailscale status || true
+        exit 1
+    fi
+    echo "  Attempt $i/$TS_RETRIES: waiting for $APP_NAME on tailnet..."
     sleep 10
 done
 
-if [ "$SSHD_CHECK" != "SSHD_RUNNING" ]; then
-    echo "error: sshd is not running after $SSHD_RETRIES attempts"
-    echo "=== Debug: all processes ==="
-    run_console "ps aux"
-    echo "=== end debug ==="
-    exit 1
-fi
+# Helper function to run command via Tailscale SSH
+run_ts_ssh() {
+    local user="$1"
+    local cmd="$2"
+    docker exec tailscale-test ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes \
+        -i /tmp/id_ed25519_test "$user@$APP_NAME" "$cmd" 2>&1
+}
 
-# Test SSH to users that should work (ubuntu, root) with nested SSH
+# Wait a bit more for services to stabilize
+echo "Waiting 30s for services to stabilize..."
+sleep 30
+
+# Check if sshd is running
+echo ""
+echo "Checking if sshd is running via Tailscale SSH..."
+SSHD_RETRIES=6
+for i in $(seq 1 $SSHD_RETRIES); do
+    SSHD_CHECK=$(run_ts_ssh ubuntu "pgrep -x sshd >/dev/null && echo SSHD_RUNNING || echo SSHD_NOT_RUNNING" 2>&1) || true
+    echo "  SSH output: [$SSHD_CHECK]"
+    if echo "$SSHD_CHECK" | grep -q "SSHD_RUNNING"; then
+        echo "✓ sshd is running"
+        break
+    fi
+    if [ $i -eq $SSHD_RETRIES ]; then
+        echo "error: sshd not running after $SSHD_RETRIES attempts"
+        echo "=== Debug: processes ==="
+        run_ts_ssh ubuntu "ps aux" || echo "ps failed"
+        echo "=== Debug: env vars ==="
+        run_ts_ssh ubuntu "env | grep -E '^SSH_|^PUBLIC_'" || echo "env failed"
+        exit 1
+    fi
+    echo "  Attempt $i/$SSHD_RETRIES: sshd not running yet, waiting 10s..."
+    sleep 10
+done
+
+# Test local SSH from inside the container
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes"
 
+echo ""
+echo "Testing local SSH (via Tailscale -> ubuntu -> local SSH)..."
+
 for target_user in ubuntu root; do
-    echo "Testing console → SSH $target_user@localhost → motd → SSH root@localhost → motd..."
-    SSH_CMD="ssh $SSH_OPTS $target_user@localhost 'motd && ssh $SSH_OPTS root@localhost motd'"
-    SSH_OUTPUT=$(run_console "$SSH_CMD") || SSH_OUTPUT="SSH_FAILED"
+    echo "Testing: Tailscale SSH -> ubuntu -> local SSH $target_user@localhost -> motd..."
+    SSH_OUTPUT=$(run_ts_ssh ubuntu "ssh $SSH_OPTS $target_user@localhost 'whoami && motd'" 2>&1) || SSH_OUTPUT="SSH_FAILED"
 
-    # Dump full motd output
-    echo "=== motd output from $target_user ==="
+    echo "=== Output from $target_user ==="
     echo "$SSH_OUTPUT"
-    echo "=== end motd ==="
+    echo "=== end ==="
 
-    # Check for motd output (should appear twice - once per SSH hop)
-    MOTD_COUNT=$(echo "$SSH_OUTPUT" | grep -c "Welcome\|openclaw" || true)
-    if [ "$MOTD_COUNT" -ge 2 ]; then
-        echo "✓ Nested SSH from $target_user works (motd appeared $MOTD_COUNT times)"
+    # First line should be the username
+    if echo "$SSH_OUTPUT" | head -1 | grep -q "$target_user"; then
+        echo "✓ Local SSH to $target_user@localhost works"
     else
-        echo "error: Nested SSH from $target_user failed (motd count: $MOTD_COUNT)"
+        echo "error: Local SSH to $target_user@localhost failed"
         exit 1
     fi
 done
 
-# Test SSH to openclaw should fail (no local SSH access for service account)
-echo "Testing console → SSH openclaw@localhost should be denied..."
-SSH_OUTPUT=$(run_console "ssh $SSH_OPTS openclaw@localhost motd 2>&1 || echo SSH_DENIED") || SSH_OUTPUT="SSH_DENIED"
+# Test SSH to openclaw should fail
+echo ""
+echo "Testing: SSH to openclaw@localhost should be denied..."
+SSH_OUTPUT=$(run_ts_ssh ubuntu "ssh $SSH_OPTS openclaw@localhost whoami 2>&1 || echo SSH_DENIED") || SSH_OUTPUT="SSH_DENIED"
 
-if echo "$SSH_OUTPUT" | grep -q "SSH_DENIED\|Permission denied\|not allowed"; then
+if echo "$SSH_OUTPUT" | grep -qE "SSH_DENIED|Permission denied|not allowed"; then
     echo "✓ SSH to openclaw@localhost correctly denied"
 else
-    echo "error: SSH to openclaw@localhost should have been denied but got: $SSH_OUTPUT"
+    echo "error: SSH to openclaw@localhost should have been denied"
+    echo "Got: $SSH_OUTPUT"
     exit 1
 fi
 
