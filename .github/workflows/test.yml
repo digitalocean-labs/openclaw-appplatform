@@ -95,7 +95,7 @@ jobs:
         run: docker load -i /tmp/openclaw-test.tar
 
       - name: Install doctl
-        if: matrix.script == '09-app-platform-deploy.sh'
+        if: contains(matrix.script, 'app-platform')
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
