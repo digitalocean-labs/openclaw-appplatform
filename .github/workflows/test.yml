@@ -52,9 +52,21 @@ jobs:
         env:
           DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
         run: |
-          REGISTRY_NAME="openclaw-ci-$(echo ${{ github.run_id }} | head -c 8)"
-          echo "Creating DOCR registry: $REGISTRY_NAME"
-          doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3
+          # Use PR number for PRs, "main" for main branch pushes
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            REGISTRY_NAME="openclaw-pr-${{ github.event.pull_request.number }}"
+          else
+            REGISTRY_NAME="openclaw-main"
+          fi
+          echo "Registry: $REGISTRY_NAME"
+
+          # Create registry if it doesn't exist
+          if ! doctl registry get "$REGISTRY_NAME" &>/dev/null; then
+            echo "Creating DOCR registry: $REGISTRY_NAME"
+            doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3
+          else
+            echo "Using existing registry: $REGISTRY_NAME"
+          fi
           echo "registry_name=$REGISTRY_NAME" >> $GITHUB_OUTPUT
 
       - name: Log in to DOCR
@@ -337,20 +349,3 @@ jobs:
       - name: Cleanup
         if: always()
         run: docker compose down || true
-
-  cleanup:
-    needs: [build, scenario]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
-
-      - name: Cleanup DOCR registry
-        env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
-        run: |
-          echo "Cleaning up DOCR registry: ${{ needs.build.outputs.registry_name }}"
-          doctl registries delete "${{ needs.build.outputs.registry_name }}" --force

@@ -1,0 +1,22 @@
+name: Cleanup PR Resources
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+
+      - name: Cleanup DOCR registry
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          REGISTRY_NAME="openclaw-pr-${{ github.event.pull_request.number }}"
+          echo "Cleaning up DOCR registry: $REGISTRY_NAME"
+          doctl registries delete "$REGISTRY_NAME" --force || echo "Registry not found (already deleted)"
