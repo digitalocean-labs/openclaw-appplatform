@@ -23,19 +23,19 @@ echo "Testing App Platform deployment..."
 
 # Check for required environment variables (doctl action sets DIGITALOCEAN_ACCESS_TOKEN)
 if [ -z "$DIGITALOCEAN_ACCESS_TOKEN" ]; then
-    echo "SKIP: DIGITALOCEAN_ACCESS_TOKEN not set (doctl not configured)"
-    exit 0
+    echo "error: DIGITALOCEAN_ACCESS_TOKEN not set (doctl not configured)"
+    exit 1
 fi
 
 if [ -z "$TS_AUTHKEY" ]; then
-    echo "SKIP: TS_AUTHKEY not set (required for app deployment)"
-    exit 0
+    echo "error: TS_AUTHKEY not set (required for app deployment)"
+    exit 1
 fi
 
 # Verify doctl is available
 if ! command -v doctl &>/dev/null; then
-    echo "SKIP: doctl not installed"
-    exit 0
+    echo "error: doctl not installed"
+    exit 1
 fi
 
 # Verify spec file exists
