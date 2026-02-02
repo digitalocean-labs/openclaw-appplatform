@@ -130,10 +130,11 @@ sleep 60
 echo ""
 echo "Testing app via console..."
 
-# Helper function to run console command
+# Helper function to run console command with pseudo-TTY
 run_console() {
     local cmd="$1"
-    echo "$cmd" | timeout 60 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>&1 | tr -d '\r'
+    # Use script to provide a pseudo-TTY since doctl console requires it
+    script -q -c "echo '$cmd' | timeout 60 doctl apps console '$APP_ID' '$COMPONENT_NAME'" /dev/null 2>&1 | tr -d '\r'
 }
 
 # Debug: dump env and service status
@@ -181,7 +182,7 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMo
 for target_user in ubuntu root; do
     echo "Testing console → SSH $target_user@localhost → motd → SSH root@localhost → motd..."
     SSH_CMD="ssh $SSH_OPTS $target_user@localhost 'motd && ssh $SSH_OPTS root@localhost motd'"
-    SSH_OUTPUT=$(echo "$SSH_CMD" | timeout 60 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r') || SSH_OUTPUT="SSH_FAILED"
+    SSH_OUTPUT=$(run_console "$SSH_CMD") || SSH_OUTPUT="SSH_FAILED"
 
     # Dump full motd output
     echo "=== motd output from $target_user ==="
@@ -200,7 +201,7 @@ done
 
 # Test SSH to openclaw should fail (no local SSH access for service account)
 echo "Testing console → SSH openclaw@localhost should be denied..."
-SSH_OUTPUT=$(echo "ssh $SSH_OPTS openclaw@localhost motd 2>&1 || echo SSH_DENIED" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r') || SSH_OUTPUT="SSH_DENIED"
+SSH_OUTPUT=$(run_console "ssh $SSH_OPTS openclaw@localhost motd 2>&1 || echo SSH_DENIED") || SSH_OUTPUT="SSH_DENIED"
 
 if echo "$SSH_OUTPUT" | grep -q "SSH_DENIED\|Permission denied\|not allowed"; then
     echo "✓ SSH to openclaw@localhost correctly denied"
