@@ -123,8 +123,8 @@ echo "Component: $COMPONENT_NAME"
 
 # Wait for container to be fully ready
 echo ""
-echo "Waiting 30s for container to stabilize..."
-sleep 30
+echo "Waiting 60s for container to stabilize..."
+sleep 60
 
 # Test app via console - verify SSH is working
 echo ""
@@ -143,17 +143,26 @@ CURRENT_USER=$(echo "whoami" | timeout 30 doctl apps console "$APP_ID" "$COMPONE
 }
 echo "✓ Console user: $CURRENT_USER"
 
-# Check if sshd is running
+# Check if sshd is running with retry
 echo "Checking if sshd is running..."
-SSHD_CHECK=$(echo "pgrep -x sshd >/dev/null && echo SSHD_RUNNING || echo SSHD_NOT_RUNNING" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r' | tail -1) || true
+SSHD_RETRIES=6
+for i in $(seq 1 $SSHD_RETRIES); do
+    SSHD_CHECK=$(echo "pgrep -x sshd >/dev/null && echo SSHD_RUNNING || echo SSHD_NOT_RUNNING" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r' | tail -1) || true
+    if [ "$SSHD_CHECK" = "SSHD_RUNNING" ]; then
+        echo "✓ sshd is running"
+        break
+    fi
+    echo "  Attempt $i/$SSHD_RETRIES: sshd not running yet, waiting 10s..."
+    sleep 10
+done
+
 if [ "$SSHD_CHECK" != "SSHD_RUNNING" ]; then
-    echo "error: sshd is not running"
+    echo "error: sshd is not running after $SSHD_RETRIES attempts"
     echo "=== Debug: all processes ==="
     echo "ps aux" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r' || echo "ps failed"
     echo "=== end debug ==="
     exit 1
 fi
-echo "✓ sshd is running"
 
 # Test SSH to users that should work (ubuntu, root) with nested SSH
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes"
