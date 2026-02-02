@@ -158,13 +158,17 @@ DEPLOY_START=$(date +%s)
 
 while true; do
     ELAPSED=$(($(date +%s) - DEPLOY_START))
-    APP_STATUS=$(doctl apps get "$APP_ID" --format ActiveDeployment.Phase --no-header 2>/dev/null || echo "UNKNOWN")
+    APP_STATUS=$(doctl apps get "$APP_ID" --format ActiveDeployment.Phase --no-header 2>/dev/null | tr -d '[:space:]')
+    [ -z "$APP_STATUS" ] && APP_STATUS="PENDING"
     echo "  [$ELAPSED s] Status: $APP_STATUS"
 
     case "$APP_STATUS" in
         ACTIVE)
             echo "✓ App deployed successfully"
             break
+            ;;
+        PENDING|PENDING_BUILD|BUILDING|PENDING_DEPLOY|DEPLOYING|UNKNOWN)
+            # Still in progress, continue waiting
             ;;
         ERROR|CANCELED)
             echo "error: App deployment failed with status: $APP_STATUS"
