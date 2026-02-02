@@ -140,7 +140,12 @@ done
 run_ts_ssh() {
     local user="$1"
     local cmd="$2"
-    docker exec tailscale-test ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes \
+    docker exec tailscale-test ssh \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -o GlobalKnownHostsFile=/dev/null \
+        -o UpdateHostKeys=no \
+        -o BatchMode=yes \
         -i /tmp/id_ed25519_test "$user@$APP_NAME" "$cmd" 2>&1
 }
 
