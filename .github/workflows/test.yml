@@ -60,8 +60,17 @@ jobs:
           fi
           echo "Registry: $REGISTRY_NAME"
 
-          # Create registry (or use existing)
-          doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3 -o json || true
+          # Create registry or verify existing
+          RESULT=$(doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3 -o json 2>&1) || {
+            # Check if registry exists via get
+            EXISTING=$(doctl registry get -o json 2>/dev/null | jq -r '.name // empty')
+            if [ "$EXISTING" = "$REGISTRY_NAME" ]; then
+              echo "Using existing registry: $REGISTRY_NAME"
+            else
+              echo "Failed to create registry: $RESULT"
+              exit 1
+            fi
+          }
           echo "registry_name=$REGISTRY_NAME" >> $GITHUB_OUTPUT
 
       - name: Log in to DOCR
