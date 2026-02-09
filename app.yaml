@@ -47,6 +47,9 @@ workers:
       - key: NGROK_AUTHTOKEN
         scope: RUN_TIME
         type: SECRET
+      - key: NGROK_ENDPOINT
+        scope: RUN_TIME
+        value: ""
 
       # ============================================================
       # TAILSCALE - Private Network Access
