@@ -6,7 +6,7 @@ This guide enables AI coding assistants (Claude Code, Cursor, Codex, Gemini, etc
 
 - Uses [do-app-sandbox](https://pypi.org/project/do-app-sandbox/) SDK for remote execution on app container console
 - References [do-app-platform-skills](https://github.com/digitalocean-labs/do-app-platform-skills) for best practices
-- Follows progressive deployment stages (CLI → UI+ngrok → Tailscale)
+- Supports two deployment modes: CLI Only and Production with Tailscale
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@ git clone https://github.com/digitalocean-labs/do-app-platform-skills ~/.claude/
 
 ---
 
-## Stage 1: Deploy CLI-Only ($5/mo)
+## CLI Only ($5/mo)
 
 The simplest deployment - gateway with CLI access only via `doctl apps console`.
 
@@ -39,7 +39,7 @@ Deploy OpenClaw to DigitalOcean App Platform using the CLI-only configuration.
 
 Use the app spec from https://github.com/digitalocean-labs/openclaw-appplatform with:
 - Instance size: basic-xxs (1 CPU, 512MB shared)
-- All feature flags disabled (ENABLE_NGROK=false, TAILSCALE_ENABLE=false, ENABLE_SPACES=false)
+- All feature flags disabled (TAILSCALE_ENABLE=false, ENABLE_SPACES=false)
 - ENABLE_UI=true (so we can use UI later if needed)
 
 After deployment:
@@ -64,58 +64,17 @@ openclaw channels status --probe
 
 ---
 
-## Stage 2: Add Web UI + ngrok ($12/mo)
-
-Public URL access to the Control UI via ngrok tunnel.
-
-### Prompt
-
-```
-Upgrade my OpenClaw deployment to Stage 2 with ngrok for public access.
-
-Update the app configuration:
-- Instance size: basic-xs (1 CPU, 1GB shared)
-- Set ENABLE_NGROK=true
-- Add NGROK_AUTHTOKEN (I'll provide it: <your-token>)
-
-After deployment:
-1. Connect via do-app-sandbox
-2. Get the ngrok URL: curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
-3. Verify gateway is accessible
-4. Show me how to access the Control UI
-
-Use do-app-platform-skills for the update process.
-```
-
-### Getting ngrok Token
-
-1. Sign up at https://dashboard.ngrok.com
-2. Go to: Your Authtoken → Copy
-
-### Verification
-
-```bash
-# Get ngrok URL
-curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
-
-# Access in browser: <ngrok-url>
-# Login with your gateway token
-```
-
----
-
-## Stage 3: Production with Tailscale ($25/mo)
+## Production with Tailscale ($12/mo + Tailscale)
 
 Private network access - most secure for production use.
 
 ### Prompt
 
 ```
-Upgrade my OpenClaw deployment to Stage 3 with Tailscale for private access.
+Upgrade my OpenClaw deployment to use Tailscale for private access.
 
 Update the app configuration:
 - Instance size: basic-s (1 CPU, 2GB shared)
-- Set ENABLE_NGROK=false
 - Set TAILSCALE_ENABLE=true
 - Add TS_AUTHKEY (I'll provide it)
 - Set STABLE_HOSTNAME=openclaw
@@ -145,7 +104,7 @@ https://openclaw.<your-tailnet>.ts.net
 
 ---
 
-## Adding Persistence (Any Stage)
+## Adding Persistence
 
 Add DO Spaces backup to preserve data across restarts.
 
@@ -329,7 +288,6 @@ cat /run/s6/container_environment/OPENCLAW_GATEWAY_TOKEN
 | "Command not found" in console | Use `openclaw` wrapper instead of `openclaw`                   |
 | Gateway not starting           | Check logs: `tail -100 /data/.openclaw/logs/gateway.log` |
 | WhatsApp disconnected          | Re-run `openclaw channels login` and scan QR                   |
-| ngrok URL not working          | Restart ngrok: `/command/s6-svc -r /run/service/ngrok`   |
 
 ### External Resources
 

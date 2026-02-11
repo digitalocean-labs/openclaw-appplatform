@@ -60,7 +60,7 @@ tests/persistence-enabled/
 
 tests/all-optional-disabled/
 ├── 01-ssh-disabled.sh        # SSH not running
-├── 02-networking-disabled.sh # Tailscale/ngrok not running
+├── 02-networking-disabled.sh # Tailscale not running
 └── 03-persistence-disabled.sh # Backup/prune not running
 ```
 

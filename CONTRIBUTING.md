@@ -28,7 +28,6 @@ Each test:
 
 # Description comment explaining what this tests
 TAILSCALE_ENABLE=false
-ENABLE_NGROK=false
 ENABLE_SPACES=false
 SSH_ENABLE=false
 ENABLE_UI=true
@@ -75,7 +74,6 @@ chmod +x tests/my-new-config/test.sh
 | Variable | Values | Description |
 |----------|--------|-------------|
 | `TAILSCALE_ENABLE` | `true`/`false` | Enable Tailscale networking |
-| `ENABLE_NGROK` | `true`/`false` | Enable ngrok tunnel |
 | `ENABLE_SPACES` | `true`/`false` | Enable DO Spaces backup |
 | `SSH_ENABLE` | `true`/`false` | Enable SSH server |
 | `ENABLE_UI` | `true`/`false` | Enable web UI |

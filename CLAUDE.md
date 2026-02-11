@@ -41,7 +41,6 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 **Services** (`rootfs/etc/services.d/`):
 - `tailscale/` - Tailscale daemon (if TAILSCALE_ENABLE=true)
 - `openclaw/` - OpenClaw gateway
-- `ngrok/` - ngrok tunnel (if ENABLE_NGROK=true)
 - `sshd/` - SSH server (if SSH_ENABLE=true)
 - `backup/` - Periodic Restic backup service (if ENABLE_SPACES=true)
 - `prune/` - Periodic Restic snapshot cleanup (if ENABLE_SPACES=true)
@@ -93,7 +92,7 @@ See `tests/CLAUDE.md` for test system details. Run locally with `make rebuild` b
 ## Gotchas
 
 - **Use `openclaw` wrapper in console sessions** - The wrapper in `/usr/local/bin/openclaw` runs commands as the correct user with proper environment. Running the binary directly as root won't work.
-- **Service restarts**: Use `/command/s6-svc -r /run/service/<name>` to restart services (openclaw, ngrok, tailscale, etc.)
+- **Service restarts**: Use `/command/s6-svc -r /run/service/<name>` to restart services (openclaw, tailscale, etc.)
 - **s6 commands not in PATH**: Use full paths: `/command/s6-svok`, `/command/s6-svstat`, `/command/s6-svc`
 - **Checking service status**: `/command/s6-svok /run/service/<name>` returns 0 if supervised; `/command/s6-svstat /run/service/<name>` shows up/down state
 - **See CHEATSHEET.md** for detailed command reference and troubleshooting

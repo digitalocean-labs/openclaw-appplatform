@@ -92,7 +92,6 @@ openclaw message send --channel discord --target channel:123456 --message "Hello
 
 ```bash
 /command/s6-svc -r /run/service/openclaw           # Restart openclaw
-/command/s6-svc -r /run/service/ngrok             # Restart ngrok
 /command/s6-svc -r /run/service/tailscale         # Restart tailscale
 /command/s6-svc -d /run/service/openclaw           # Stop openclaw
 /command/s6-svc -u /run/service/openclaw           # Start openclaw
@@ -122,15 +121,6 @@ env | grep ENABLE                                 # Feature flags
 
 ---
 
-## ngrok (when ENABLE_NGROK=true)
-
-```bash
-curl -s http://127.0.0.1:4040/api/tunnels | jq .  # Get ngrok tunnel info
-curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
-```
-
----
-
 ## Quick Diagnostics
 
 ```bash
@@ -144,7 +134,7 @@ echo "--- Config ---" && \
 cat /data/.openclaw/openclaw.json | jq .
 
 # Check what's running
-ps aux | grep -E "(openclaw|ngrok|tailscale)"
+ps aux | grep -E "(openclaw|tailscale)"
 
 # Disk usage
 df -h /data
@@ -225,7 +215,6 @@ ls /etc/services.d/*/dependencies.d/
 |-------|-----|
 | "Gateway token not configured" | `jq .gateway.auth.token /data/.openclaw/openclaw.json` |
 | WhatsApp disconnected after restart | `openclaw channels login` (re-scan QR) or check if backup restored state |
-| ngrok tunnel not accessible | `curl http://127.0.0.1:4040/api/tunnels` then restart |
 | Command not found (as root) | Use `openclaw` wrapper instead of `openclaw` |
 | Backup not running | Check: `ps aux \| grep restic-backup` and logs in `/proc/1/fd/1` |
 | Data lost after restart | Verify `ENABLE_SPACES=true` and check `restic snapshots` |

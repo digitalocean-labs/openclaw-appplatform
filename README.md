@@ -4,16 +4,32 @@ Deploy [OpenClaw](https://github.com/openclaw/openclaw) - a multi-channel AI mes
 
 [![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/openclaw-appplatform/tree/main)
 
-## Quick Start: Choose Your Stage
+## Table of Contents
 
-| Stage                   | What You Get            | Access Method        |
+- [Quick Start: Choose Your Deployment](#quick-start-choose-your-deployment)
+- [Architecture](#architecture)
+- [CLI Only - The Basics](#cli-only---the-basics)
+- [Production with Tailscale](#production-with-tailscale)
+- [Setting up Tailscale](#setting-up-tailscale)
+- [Adding Persistence](#adding-persistence)
+- [AI-Assisted Setup](#ai-assisted-setup)
+- [CLI Cheat Sheet](#cli-cheat-sheet)
+- [Environment Variables](#environment-variables)
+- [Customization (s6-overlay)](#customization-s6-overlay)
+- [Available Regions](#available-regions)
+- [Documentation](#documentation)
+
+---
+
+## Quick Start: Choose Your Deployment
+
+| Deployment              | What You Get            | Access Method        |
 |-------------------------|-------------------------|----------------------|
-| **1. CLI Only**         | Gateway + CLI           | `doctl apps console` |
-| **2. + Web UI + ngrok** | Control UI + Public URL | ngrok URL            |
-| **3. + Tailscale**      | Private Network         | Tailscale hostname   |
+| **CLI Only**            | Gateway + CLI           | `doctl apps console` |
+| **+ Tailscale**         | Private Network + UI    | Tailscale hostname   |
 | **+ Persistence**       | Data survives restarts  | DO Spaces            |
 
-**Start simple, add features as needed.** Most users start with Stage 2 (ngrok) for the easiest setup.
+**Start simple, add features as needed.** Start with CLI Only for basic access, then add Tailscale for secure private network access and UI.
 
 ---
 
@@ -33,8 +49,7 @@ Deploy [OpenClaw](https://github.com/openclaw/openclaw) - a multi-channel AI mes
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │ Access Layer (choose one):                                   │  │
 │  │  • Console only (default) - doctl apps console               │  │
-│  │  • ngrok (ENABLE_NGROK) - Public tunnel to UI                │  │
-│  │  • Tailscale (TAILSCALE_ENABLE) - Private network            │  │
+│  │  • Tailscale (TAILSCALE_ENABLE) - Private network + UI       │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │ Optional: SSH Server (SSH_ENABLE=true)                        │  │
@@ -51,7 +66,7 @@ Deploy [OpenClaw](https://github.com/openclaw/openclaw) - a multi-channel AI mes
 
 ---
 
-## Stage 1: CLI Only - The Basics
+## CLI Only - The Basics
 
 The simplest deployment. Access via `doctl apps console` and use CLI commands.
 
@@ -62,7 +77,7 @@ The simplest deployment. Access via `doctl apps console` and use CLI commands.
 git clone https://github.com/digitalocean-labs/openclaw-appplatform
 cd openclaw-appplatform
 
-# Edit app.yaml - set instance size for Stage 1
+# Edit app.yaml - set instance size
 # instance_size_slug: apps-s-1vcpu-2gb  # 1 CPU, 2GB (minimum for stable operation)
 
 # Set your OPENCLAW_GATEWAY_TOKEN in app.yaml or DO dashboard
@@ -98,50 +113,7 @@ openclaw channels status --probe
 
 ---
 
-## Stage 2: Add Web UI + ngrok
-
-Add a public URL to access the Control UI. **Recommended for getting started.**
-
-### Get ngrok Token
-
-1. Sign up at <https://dashboard.ngrok.com>
-2. Copy your authtoken from the dashboard
-
-### Deploy
-
-Update `app.yaml`:
-
-```yaml
-instance_size_slug: apps-s-1vcpu-2gb  # 1 CPU, 2GB
-
-envs:
-  - key: ENABLE_NGROK
-    value: "true"
-  - key: NGROK_AUTHTOKEN
-    type: SECRET
-    # Set value in DO dashboard
-```
-
-### Get Your URL
-
-```bash
-# In console
-curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
-```
-
-Or check the ngrok dashboard at <https://dashboard.ngrok.com/tunnels>
-
-### What's Added
-
-- ✅ Everything from Stage 1
-- ✅ Web Control UI
-- ✅ Public URL via ngrok
-- ❌ URL changes on restart (use Tailscale for stable URL)
-- ❌ Data lost on restart
-
----
-
-## Stage 3: Production with Tailscale
+## Production with Tailscale
 
 Private network access via your Tailscale tailnet. **Recommended for production.**
 
@@ -160,8 +132,6 @@ Update `app.yaml`:
 instance_size_slug: apps-s-1vcpu-2gb  # 1 CPU, 2GB
 
 envs:
-  - key: ENABLE_NGROK
-    value: "false"
   - key: TAILSCALE_ENABLE
     value: "true"
   - key: TS_AUTHKEY
@@ -178,7 +148,8 @@ https://openclaw.<your-tailnet>.ts.net
 
 ### What's Added
 
-- ✅ Everything from Stage 1 & 2
+- ✅ Everything from CLI Only
+- ✅ Web Control UI
 - ✅ Stable hostname on your tailnet
 - ✅ Private access (only your devices)
 - ✅ Production-grade security
@@ -245,7 +216,7 @@ https://<hostname>.<your-tailnet>.ts.net
 
 ---
 
-## Adding Persistence (Any Stage)
+## Adding Persistence
 
 Without persistence, all data is lost when the container restarts. Add DO Spaces to preserve:
 
@@ -342,7 +313,6 @@ openclaw message send --channel whatsapp --target "+1234567890" --message "Hello
 
 # Services
 /command/s6-svc -r /run/service/openclaw    # Restart
-/command/s6-svc -r /run/service/ngrok      # Restart ngrok
 
 # Logs
 tail -f /data/.openclaw/logs/gateway.log
@@ -368,17 +338,10 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 
 | Variable           | Default | Description                  |
 |--------------------|---------|------------------------------|
-| `ENABLE_NGROK`     | `false` | Enable ngrok tunnel          |
 | `ENABLE_TAILSCALE` | `false` | Enable Tailscale             |
 | `ENABLE_SPACES`    | `false` | Enable DO Spaces persistence |
 | `ENABLE_UI`        | `true`  | Enable web Control UI        |
 | `SSH_ENABLE`       | `false` | Enable SSH server            |
-
-### ngrok (when ENABLE_NGROK=true)
-
-| Variable          | Description           |
-|-------------------|-----------------------|
-| `NGROK_AUTHTOKEN` | Your ngrok auth token |
 
 ### Tailscale (when TAILSCALE_ENABLE=true)
 
@@ -444,7 +407,6 @@ exec my-daemon --foreground
 | Service     | Description                                              |
 |-------------|----------------------------------------------------------|
 | `openclaw`  | OpenClaw gateway                                         |
-| `ngrok`     | ngrok tunnel (if enabled)                                |
 | `tailscale` | Tailscale daemon (if enabled)                            |
 | `backup`    | Restic backup service - creates snapshots (if enabled)   |
 | `prune`     | Restic prune service - cleans old snapshots (if enabled) |
