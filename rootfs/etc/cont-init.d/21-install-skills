@@ -1,0 +1,93 @@
+#!/command/with-contenv bash
+# Pre-install OpenClaw skills from configuration
+# Sources: /etc/openclaw/skills.yaml and OPENCLAW_SKILLS env var
+source /etc/s6-overlay/lib/env-utils.sh
+
+set -e
+source_env_prefix OPENCLAW_
+
+SKILLS_CONFIG="${OPENCLAW_SKILLS_CONFIG:-/etc/openclaw/skills.yaml}"
+PNPM_HOME="/home/openclaw/.local/share/pnpm"
+
+# Collect all skill specs into an array
+declare -a skill_specs=()
+
+# Read skills from YAML config file
+if [ -f "$SKILLS_CONFIG" ]; then
+  skill_count=$(yq '.skills | length' "$SKILLS_CONFIG" 2>/dev/null || echo "0")
+  if [ "$skill_count" -gt 0 ]; then
+    echo "[install-skills] Reading $skill_count skill(s) from $SKILLS_CONFIG"
+    for i in $(seq 0 $((skill_count - 1))); do
+      pkg=$(yq -r ".skills[$i].package" "$SKILLS_CONFIG")
+      version=$(yq -r ".skills[$i].version // \"\"" "$SKILLS_CONFIG")
+      [[ "$version" == "null" ]] && version=""
+
+      if [ -n "$pkg" ] && [ "$pkg" != "null" ]; then
+        if [ -n "$version" ]; then
+          skill_specs+=("${pkg}@${version}")
+        else
+          skill_specs+=("$pkg")
+        fi
+      fi
+    done
+  fi
+fi
+
+# Read skills from OPENCLAW_SKILLS env var (comma-separated package specs)
+if [ -n "${OPENCLAW_SKILLS:-}" ]; then
+  echo "[install-skills] Reading skills from OPENCLAW_SKILLS env var"
+  IFS=',' read -ra env_skills <<< "$OPENCLAW_SKILLS"
+  for spec in "${env_skills[@]}"; do
+    spec=$(echo "$spec" | xargs)  # trim whitespace
+    if [ -n "$spec" ]; then
+      skill_specs+=("$spec")
+    fi
+  done
+fi
+
+# Deduplicate: later entries (env var) override earlier ones (YAML) for the same package name
+declare -A seen_packages=()
+declare -a final_specs=()
+
+# Process in reverse so env var entries win over YAML for same package
+for ((i=${#skill_specs[@]}-1; i>=0; i--)); do
+  spec="${skill_specs[$i]}"
+  # Extract package name (strip @version suffix, handling scoped packages like @scope/name@1.0)
+  if [[ "$spec" == @* ]]; then
+    # Scoped package: @scope/name or @scope/name@version
+    pkg_name=$(echo "$spec" | sed 's/^\(@[^/]*\/[^@]*\).*/\1/')
+  else
+    # Unscoped package: name or name@version
+    pkg_name="${spec%%@*}"
+  fi
+
+  if [ -z "${seen_packages[$pkg_name]+_}" ]; then
+    seen_packages[$pkg_name]=1
+    final_specs=("$spec" "${final_specs[@]}")
+  fi
+done
+
+if [ ${#final_specs[@]} -eq 0 ]; then
+  echo "[install-skills] No skills configured, skipping"
+  exit 0
+fi
+
+echo "[install-skills] Installing ${#final_specs[@]} skill(s): ${final_specs[*]}"
+
+# Install skills as the openclaw user via pnpm
+install_failed=false
+for spec in "${final_specs[@]}"; do
+  echo "[install-skills] Installing: $spec"
+  if su - openclaw -c "export PNPM_HOME='$PNPM_HOME' && export PATH=\"\$PNPM_HOME:\$PATH\" && source \$HOME/.nvm/nvm.sh && pnpm add -g '$spec'" 2>&1; then
+    echo "[install-skills] Installed: $spec"
+  else
+    echo "[install-skills] WARNING: Failed to install: $spec" >&2
+    install_failed=true
+  fi
+done
+
+if [ "$install_failed" = true ]; then
+  echo "[install-skills] Some skills failed to install (see warnings above)"
+else
+  echo "[install-skills] All skills installed successfully"
+fi

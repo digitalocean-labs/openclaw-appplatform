@@ -1,0 +1,16 @@
+# OpenClaw Skills Configuration
+# Skills listed here are installed automatically during container init.
+#
+# Each skill is an npm package installed via pnpm as the openclaw user.
+# You can also set OPENCLAW_SKILLS env var for quick overrides (comma-separated).
+#
+# Format:
+#   skills:
+#     - package: "@openclaw/skill-web-search"
+#     - package: "@openclaw/skill-code-runner"
+#       version: "1.2.3"
+#
+# The OPENCLAW_SKILLS env var accepts comma-separated package specs:
+#   OPENCLAW_SKILLS=@openclaw/skill-web-search,@openclaw/skill-code-runner@1.2.3
+
+skills: []

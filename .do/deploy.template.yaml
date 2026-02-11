@@ -68,6 +68,11 @@ spec:
           scope: RUN_TIME
           type: SECRET
 
+        # Skills (comma-separated npm package specs)
+        - key: OPENCLAW_SKILLS
+          scope: RUN_TIME
+          value: ""
+
         # Optional
         - key: OPENCLAW_GATEWAY_TOKEN
           scope: RUN_TIME

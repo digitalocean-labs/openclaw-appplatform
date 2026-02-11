@@ -19,6 +19,7 @@ make shell                     # Shell into running container
 - `app.yaml` - App Platform service configuration (for reference, uses worker for Tailscale)
 - `.do/deploy.template.yaml` - App Platform worker configuration (recommended)
 - `rootfs/etc/openclaw/openclaw.default.json` - Base gateway configuration template
+- `rootfs/etc/openclaw/skills.yaml` - Skills pre-installation configuration
 - `rootfs/etc/digitalocean/backup.yaml` - Restic backup configuration (paths, intervals, retention policy)
 - `tailscale` - Wrapper script to inject socket path for tailscale CLI
 - `rootfs/` - Overlay directory for custom files and s6 services
@@ -36,6 +37,7 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 - `11-reinstall-brews` - Reinstalls Homebrew packages from backup (if Homebrew installed)
 - `12-ssh-import-ids` - Imports SSH keys from GitHub (if GITHUB_USERNAME set)
 - `20-setup-openclaw` - Builds openclaw.json from environment variables
+- `21-install-skills` - Pre-installs skills from `skills.yaml` and `OPENCLAW_SKILLS` env var
 - `99999-apply-permissions` - Applies final file permissions
 
 **Services** (`rootfs/etc/services.d/`):
@@ -69,6 +71,27 @@ Set `GRADIENT_API_KEY` to enable DigitalOcean's serverless AI inference with mod
 - Llama 3.3 70B Instruct
 - Claude 4.5 Sonnet / Opus 4.5
 - DeepSeek R1 Distill Llama 70B
+
+## Skills
+
+Skills (npm packages) can be pre-installed at container startup from two sources:
+
+**Environment variable** (`OPENCLAW_SKILLS`): Comma-separated package specs.
+
+```bash
+OPENCLAW_SKILLS=@openclaw/skill-web-search,@openclaw/skill-code-runner@1.2.3
+```
+
+**YAML config** (`rootfs/etc/openclaw/skills.yaml`): For detailed configuration baked into the image.
+
+```yaml
+skills:
+  - package: "@openclaw/skill-web-search"
+  - package: "@openclaw/skill-code-runner"
+    version: "1.2.3"
+```
+
+Both sources are merged. When the same package appears in both, the env var takes precedence. Skills are installed as global pnpm packages for the `openclaw` user during the `21-install-skills` init phase.
 
 ## Persistence
 
