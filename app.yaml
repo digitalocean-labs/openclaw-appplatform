@@ -9,7 +9,6 @@ workers:
     instance_size_slug: apps-s-1vcpu-2gb # Minimum 2GB required - 1GB causes heap overflow
     github:
       branch: main
-      deploy_on_push: true
       repo: digitalocean-labs/openclaw-appplatform
     envs:
       # ============================================================
