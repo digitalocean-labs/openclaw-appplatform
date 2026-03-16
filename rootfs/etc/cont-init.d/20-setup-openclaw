@@ -82,14 +82,22 @@ fi
 persist_env_var OPENCLAW_ OPENCLAW_GATEWAY_TOKEN="$OPENCLAW_GATEWAY_TOKEN"
 echo "[generate-config] Gateway token configured (OPENCLAW_GATEWAY_TOKEN)"
 
-# Start with default config as base
-if [ -f "$DEFAULT_CONFIG" ]; then
-  cp "$DEFAULT_CONFIG" "$CONFIG_FILE"
-  echo "[generate-config] Using default config from $DEFAULT_CONFIG"
+# Preserve existing user config across restarts; only seed from defaults on first boot.
+# User settings (models, plugins, agents, etc.) are saved to this file by OpenClaw's
+# Control UI and should survive container restarts and redeployments.
+if [ -f "$CONFIG_FILE" ] && jq empty "$CONFIG_FILE" >/dev/null 2>&1; then
+  echo "[generate-config] Existing config found at $CONFIG_FILE; preserving user settings"
 else
-  # Fallback minimal config if default doesn't exist
-  echo '{"gateway": {"mode": "local"}}' > "$CONFIG_FILE"
-  echo "[generate-config] Warning: Default config not found, using minimal config"
+  if [ -f "$CONFIG_FILE" ]; then
+    echo "[generate-config] WARNING: Existing config is invalid JSON; regenerating from defaults"
+  fi
+  if [ -f "$DEFAULT_CONFIG" ]; then
+    cp "$DEFAULT_CONFIG" "$CONFIG_FILE"
+    echo "[generate-config] Using default config from $DEFAULT_CONFIG"
+  else
+    echo '{"gateway": {"mode": "local"}}' > "$CONFIG_FILE"
+    echo "[generate-config] Warning: Default config not found, using minimal config"
+  fi
 fi
 
 # Handle ENABLE_UI flag - disable Control UI if set to false
@@ -104,9 +112,16 @@ if [ "${TAILSCALE_ENABLE:-false}" = "true" ]; then
   jq '.gateway.tailscale.resetOnExit = true | .gateway.tailscale.mode = "serve" | .gateway.auth.allowTailscale = true' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 fi
 
+# Ensure tools.profile defaults to "coding" (2026.3.x changed default to "messaging")
+jq '.tools.profile //= "coding"' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+echo "[generate-config] tools.profile: $(jq -r '.tools.profile' "$CONFIG_FILE")"
+
 # Add gateway auth token to config
 echo "[generate-config] Adding gateway.auth.token to config"
 jq --arg token "$OPENCLAW_GATEWAY_TOKEN" '.gateway.auth.token = $token | .gateway.auth.mode = "token"' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+
+# Fix ownership: this script runs as root but openclaw service runs as user openclaw
+chown openclaw:openclaw "$CONFIG_FILE"
 
 # Permissions applied via /etc/digitalocean/permissions.yaml
 

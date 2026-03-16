@@ -71,5 +71,8 @@
                 "primary": "gradient/openai-gpt-oss-120b"
             }
         }
+    },
+    "tools": {
+        "profile": "coding"
     }
 }

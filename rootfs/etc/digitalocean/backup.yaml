@@ -31,6 +31,10 @@ paths:
       - "*.lock"
       - "*.pid"
       - "*.sock"
+      # pnpm global store is managed by the Docker image (pnpm add -g openclaw@VERSION).
+      # Restoring it from backup causes version mismatches after upgrades.
+      - ".local/share/pnpm/global"
+      - ".local/share/pnpm/store"
 
 # Global settings
 backup_interval_seconds: 30 # 30 seconds
