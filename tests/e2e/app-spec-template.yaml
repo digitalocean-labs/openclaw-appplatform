@@ -1,0 +1,43 @@
+# App Platform E2E test spec — deployed from pre-built GHCR image.
+# Env vars with ${...} placeholders are substituted by deploy-and-test.sh at runtime.
+#
+# This is a WORKER (no public HTTP route). The gateway binds to 127.0.0.1:18789
+# inside the container. Tests verify it via `doctl apps console`.
+name: openclaw-e2e-PLACEHOLDER_RUN_ID
+region: nyc
+
+workers:
+  - name: openclaw
+    image:
+      registry_type: GHCR
+      registry: ghcr.io
+      repository: PLACEHOLDER_REPOSITORY
+      tag: PLACEHOLDER_IMAGE_TAG
+    instance_size_slug: apps-s-1vcpu-2gb
+    instance_count: 1
+    envs:
+      # Required
+      - key: OPENCLAW_GATEWAY_TOKEN
+        scope: RUN_TIME
+        value: PLACEHOLDER_GATEWAY_TOKEN
+        type: SECRET
+      - key: STABLE_HOSTNAME
+        scope: RUN_TIME
+        value: openclaw-e2e
+
+      # Feature flags — minimal for E2E
+      - key: ENABLE_NGROK
+        scope: RUN_TIME
+        value: "false"
+      - key: TAILSCALE_ENABLE
+        scope: RUN_TIME
+        value: "false"
+      - key: ENABLE_SPACES
+        scope: RUN_TIME
+        value: "false"
+      - key: ENABLE_UI
+        scope: RUN_TIME
+        value: "true"
+      - key: SSH_ENABLE
+        scope: RUN_TIME
+        value: "false"
